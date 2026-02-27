@@ -1,5 +1,5 @@
 # Check for admin rights
-<# $isAdmin = ([Security.Principal.WindowsPrincipal] `
+$isAdmin = ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent()
 ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
@@ -8,7 +8,7 @@ if (-not $isAdmin) {
     Write-Host "Please run this script as Administrator." -ForegroundColor Red
     exit
 }
- #>
+
 
 
 # ALL THE OPTION MENUS
