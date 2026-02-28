@@ -21,13 +21,13 @@ The goal is simple: **save technician time and reduce human error** during routi
 
 ## ✨ Features
 
-* ✅ Admin privilege detection
-* ✅ Menu-driven interactive interface
-* ✅ Automated app installs via winget
-* ✅ Windows 11 classic context menu fix
-* ✅ Safe change confirmation prompts
-* ✅ Revert support for registry changes
-* ✅ Modular function-based design
+* Admin privilege detection
+* Menu-driven interactive interface
+* Automated app installs via winget
+* Windows 11 classic context menu fix
+* Safe change confirmation prompts
+* Revert support for registry changes
+* Modular function-based design
 
 ---
 
