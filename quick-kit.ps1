@@ -202,6 +202,7 @@ function InstallHandler {
         [String]
         $ReadableAppID = $AppID.Replace("."," ")
     )
+    Clear-Host
     Write-Host "Installing $ReadableAppID"
     if (-not $Global:VerboseEnabled) {
         Write-Log -Message "Installing $ReadableAppID"
@@ -212,19 +213,20 @@ function InstallHandler {
 
     if ($LASTEXITCODE -eq 0) {
         Write-Log -Message "Successfully installed $ReadableAppID"
-        Write-Host "Successfully installed $ReadableAppID, returning to essential app install menu" -ForegroundColor Green 
+        Write-Host "Successfully installed $ReadableAppID, returning to essential app install menu" -ForegroundColor Green
     } elseif (-not $Global:VerboseEnabled) {
         Write-Log -Type ERROR -Message "Failed to install $ReadableAppID, suggesting to retry installation"
         Write-Host "Failed to install $ReadableAppID."
     } else {
         Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE, suggesting to retry installation"
         Write-Host "Failed to install $ReadableAppID."
-    } 
+    }
+    Start-Sleep 3
 }
 
 function InstallingBrowsers {
     while ($true) {
-        <# Clear-Host #>
+        Clear-Host
         $option = InstallMenuBrowsers
 
         if ($option -eq "") {
@@ -302,7 +304,7 @@ function InstallingEssentials {
 function RevertChanges {
 
     while ($true) {
-        <# Clear-Host #>
+        Clear-Host
         Write-Host "kostikasz IT support quick kit
 
 Want to revert changes? Make sure you don't have unsaved work:
@@ -343,7 +345,7 @@ function RegistryHandler {
     if (-not (Confirm)) {
         return
     }
-
+    Clear-Host
     # Checking if registery already exists
     Write-Log -Type VERBOSE -Message "Checking if registry already exists by running query at $RegPath"
     $RegStatus=reg.exe query $RegPath
@@ -364,10 +366,8 @@ function RegistryHandler {
             Stop-Process -ProcessName explorer -Force #TODO make silent
             Start-Process explorer
             Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
-            Clear-Host
             Write-Log -Message "SUCCESS, reverted $FixName fix."
             Write-Host "Fix deleted successfully, returning to menu"
-            Start-Sleep 2
         }
     } else {
             #Make it check if the registery edit already exists
@@ -380,11 +380,10 @@ function RegistryHandler {
             Stop-Process -ProcessName explorer -Force #TODO make silent
             Start-Process explorer
             Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
-            Clear-Host
             Write-Log -Message "SUCCESS, applied $FixName fix."
             Write-Host "Fix applied Successfully, returning to menu"
-            Start-Sleep 2
     }
+    Start-Sleep 2
 }
 
 function ApplyFixes {
@@ -400,7 +399,6 @@ function ApplyFixes {
 
         switch ($option.ToLower()) {
         "1" {
-            <# Clear-Host #>
             RegistryHandler -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu"
             }
         
