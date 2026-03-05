@@ -1,10 +1,13 @@
 # https://github.com/kostikasz
 
+param (
+    [Parameter(Mandatory=$false)]
+    [Switch]
+    $EnableVerbose
+)
 
 # Global settings
-$Global:VerboseEnabled = $true  # default
-
-
+$Global:VerboseEnabled = $EnableVerbose.IsPresent
 
 function Write-Log {
     <#
