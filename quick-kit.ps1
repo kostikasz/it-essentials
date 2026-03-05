@@ -6,24 +6,22 @@ param (
     $EnableVerbose
 )
 
+
+
 # Global settings
 $Global:VerboseEnabled = $EnableVerbose.IsPresent
+$Script:LogFile = Join-Path -Path '.\logs\' -ChildPath "$(Split-Path $PSCommandPath -Leaf) - $(Get-Date -f 'yyyy-MM-dd_HH-mm-ss').log"
 
 function Write-Log {
-    <#
-    .SYNOPSIS
-    Creates and/or appends messages to a log file, adapted from the community
-    #>
-
     [CmdletBinding()]
     Param (
         [Parameter(HelpMessage = 'Path for the log file. Default value .\logs\')]
         [String]
         $Path = '.\logs\',
 
-        [Parameter(HelpMessage = 'Log file Name')]
+        [Parameter(HelpMessage = 'Log file Name. Defaults to script-level variable if set')]
         [String]
-        $LogName = "$(Split-Path $PSCommandPath -Leaf) - $(Get-Date -f 'yyyy-MM-dd_HH-mm-ss').log",
+        $LogFile = $Script:LogFile,
 
         [Parameter(Mandatory = $true, HelpMessage = 'Message to add in the log file')]
         [String]
@@ -36,15 +34,15 @@ function Write-Log {
     )
 
     BEGIN {
-        # Ensure folder exists
-        if (-not (Test-Path -Path $Path)) {
-            New-Item -Path $Path -ItemType Directory -Force | Out-Null
+        # Fall back to generating a name if no script-level variable exists
+        if (-not $LogFile) {
+            $LogFile = Join-Path -Path $Path -ChildPath "$(Split-Path $PSCommandPath -Leaf) - $(Get-Date -f 'yyyy-MM-dd_HH-mm-ss').log"
         }
 
-        # Determine full log file path
-        $LogFile = Join-Path -Path $Path -ChildPath $LogName
-
-        # Ensure log file exists
+        # Ensure folder and file exist
+        if (-not (Test-Path -Path (Split-Path $LogFile -Parent))) {
+            New-Item -Path (Split-Path $LogFile -Parent) -ItemType Directory -Force | Out-Null
+        }
         if (-not (Test-Path -Path $LogFile)) {
             New-Item -Path $LogFile -ItemType File -Force | Out-Null
         }
@@ -66,6 +64,11 @@ function Write-Log {
 }
 
 Write-Log -Message "Script Successfully started"
+
+if ($Global:VerboseEnabled) {
+    Write-Log -Type VERBOSE -Message "Verbose logging is enabled"
+}
+
 
 <# Usage
 # With the default values
