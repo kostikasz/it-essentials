@@ -95,17 +95,6 @@ if ($Global:VerboseEnabled) {
     Write-Log -Type VERBOSE -Message "Verbose logging is enabled"
 }
 
-
-<# Usage
-# With the default values
-Write-Log -Message "This is a message"
-# Passing values for some parameters
-Write-Log -Type Warning -Message "this is a warning message"
-# Passing all values for parameters
-Write-Log -Path C:\OtherPath -LogName "MyLog.txt" -Type Error -Message This is a error message"
-#>
-
-
 # Check for admin rights
 Write-Log -Type VERBOSE -Message "Checking if the user has admin permisssions with Windows Identity"
 
@@ -208,18 +197,6 @@ Choose an option:
 
 "
     return MenuHandler -ValidOptions 'y','n' # Function returns the choice
-<#         $choice = Read-Host 'Enter choice'
-
-        switch ($choice.ToLower()) {
-            'y' { return $true }
-            'n' { return $false }
-            default {
-                Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-                Write-Host "Invalid option."
-                continue
-            }
-        }
-    } #>
 }
 
 
@@ -277,7 +254,7 @@ function InstallHandler {
         Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE. $friendly_message"
         Write-Warning "Failed to install $ReadableAppID. $friendly_message"
     } else {
-        # Fallback: scrape a useful line from winget's own output
+        # Fallback: scrapes a useful line from winget's own output
         $wingetError = $result | Where-Object { $_ -match "error|failed|invalid" } | Select-Object -Last 1
         $fallback = if ($wingetError) { $wingetError.ToString().Trim() } else { "Unknown error (code: $LASTEXITCODE)" }
         if (-not $Global:VerboseEnabled) {
@@ -385,7 +362,6 @@ function RegistryHandler {
                 Write-Log -Type VERBOSE -Message "Restarting Windows Explorer"
                 $Global:ExplorerKilled = $true
                 Stop-Process -ProcessName explorer -Force #TODO make silent
-                Start-Sleep 10 #asdjadjaisdjiajd
                 Start-Process explorer
                 $Global:ExplorerKilled = $false
                 Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
