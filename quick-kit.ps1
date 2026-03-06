@@ -136,10 +136,11 @@ function StartingMenu {
 Choose an option:
 [1] Install essential apps
 [2] Install fixes
+[3] System information
 [Q] Quit
 
 "
-    return MenuHandler -ValidOptions '1','2','q' # Function returns the choice
+    return MenuHandler -ValidOptions '1','2','3','q' # Function returns the choice
 }
 
 function InstallMenu {
@@ -184,6 +185,22 @@ Choose an option:
     return MenuHandler -ValidOptions '1','2','q' # Function returns the choice
 }
 
+function SystemMenu {
+           Write-Host "kostikasz IT support quick kit
+
+System info module:
+Choose an option:
+[1] OS info
+[2] CPU info
+[3] RAM info
+[4] Disk space info
+[5] Format system info into a file
+[Q] Quit to main menu
+
+"
+    return MenuHandler -ValidOptions '1','2','3','4','5','q' # Function returns the choice
+    
+}
 
 function ConfirmPrompt {
     Write-Host "kostikasz IT support quick kit
@@ -440,6 +457,45 @@ function ApplyFixes {
     }
 }
 
+function SystemInfo {
+    while ($true) {
+
+        switch (SystemMenu) {
+        "1" {
+            Clear-Host
+            GetOS
+            }
+        
+        "2" {
+            Clear-Host
+            GetCPU
+            continue
+        }
+        "3" {
+            Clear-Host
+            GetRAM
+            continue
+        }
+        "4" {
+            Clear-Host
+            GetDisk
+            continue
+        }
+        "5" {
+            Clear-Host
+            OutputSysInfo
+            continue
+        }
+        "q" {
+            Clear-Host
+            Write-Host "Returning to main menu"
+            return
+        }
+       }
+
+    }
+}
+
 
 # Main loop of the starting menu
 Clear-Host
@@ -456,6 +512,11 @@ while ($true) {
                 Clear-Host
                 Write-Host "Opening fix menu"
                 ApplyFixes
+        }
+        "3" {
+                Clear-Host
+                Write-Host "Opening system info menu"
+                SystemInfo
         }
         "q" {
                 Clear-Host
