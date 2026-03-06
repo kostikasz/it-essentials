@@ -12,6 +12,30 @@ param (
 $Global:VerboseEnabled = $EnableVerbose.IsPresent
 $Script:LogFile = Join-Path -Path '.\logs\' -ChildPath "$(Split-Path $PSCommandPath -Leaf) - $(Get-Date -f 'yyyy-MM-dd_HH-mm-ss').log"
 
+function MenuHandler {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string[]]
+        $ValidOptions # Should all be passed in lower-case
+    )
+    
+    while ($true) {
+        $option = (Read-Host "Enter choice").ToLower().Trim()
+
+        if ($option -eq "") {
+            Write-Log -Type WARNING -Message "User inputed nothing into the menu prompt, retrying"
+            Write-Host "You input nothing."
+            continue
+        } elseif ($option -notin $ValidOptions) {
+            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
+            Write-Host "Invalid option."
+            continue
+        } else {
+            return $option
+        }
+    }
+}
+
 function Write-Log {
     [CmdletBinding()]
     Param (
@@ -115,7 +139,7 @@ Choose an option:
 [Q] Quit
 
 "
-    return Read-Host "Enter choice: " # Function returns the choice
+    return MenuHandler -ValidOptions '1','2','q' # Function returns the choice
 }
 
 function InstallMenu {
@@ -129,12 +153,12 @@ Choose an option:
 [4] Other
 [Q] Quit to main menu
 
-       "
-       return Read-Host "Enter choice: " # Function returns the choice
+"
+    return MenuHandler -ValidOptions '1','2','3','4','q' # Function returns the choice
 }
 
 function InstallMenuBrowsers {
-       Write-Host "kostikasz IT support quick kit
+    Write-Host "kostikasz IT support quick kit
 
 BROWSERS INSTALLATION
 Choose an option:
@@ -143,8 +167,8 @@ Choose an option:
 [3] Brave
 [Q] Quit to main menu
 
-       "
-       return Read-Host "Enter choice: " # Function returns the choice
+"
+    return MenuHandler -ValidOptions '1','2','3','q' # Function returns the choice
 }
 
 function FixMenu {
@@ -156,23 +180,33 @@ Choose an option:
 [2] Coming Soon
 [Q] Quit to main menu
 
-       "
-       return Read-Host "Enter choice: " # Function returns the choice
+"
+    return MenuHandler -ValidOptions '1','2','q' # Function returns the choice
 }
 
 
-function Confirm {
-
-    while ($true) {
-        Clear-Host
-        Write-Host "kostikasz IT support quick kit
+function ConfirmPrompt {
+    Write-Host "kostikasz IT support quick kit
 
 Are you sure? Make sure you don't have unsaved work.:
 Choose an option:
 [Y] Y (Yes)     [N] N (No)
 
-       "
-        $choice = Read-Host 'Enter choice'
+"
+    return MenuHandler -ValidOptions 'y','n' # Function returns the choice
+}
+
+function RevertChanges {
+
+    Write-Host "kostikasz IT support quick kit
+
+Want to revert changes? Make sure you don't have unsaved work:
+Choose an option:
+[Y] Y (Yes)     [N] N (No)
+
+"
+    return MenuHandler -ValidOptions 'y','n' # Function returns the choice
+<#         $choice = Read-Host 'Enter choice'
 
         switch ($choice.ToLower()) {
             'y' { return $true }
@@ -180,12 +214,12 @@ Choose an option:
             default {
                 Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
                 Write-Host "Invalid option."
-                Start-Sleep 1
                 continue
             }
         }
-    }
+    } #>
 }
+
 
 function InstallHandler {
     param (
@@ -255,26 +289,15 @@ function InstallHandler {
 
 function InstallingBrowsers {
     while ($true) {
-        Clear-Host
-        $option = InstallMenuBrowsers
 
-        if ($option -eq "") {
-            Write-Host "You input nothing."
-            Start-Sleep 1
-            continue
-        }
-
-
-        switch ($option.ToLower()) {
+        switch (InstallMenuBrowsers) {
         "1" {
-            Clear-Host
             InstallHandler -AppID "Google.Chrome"
         }
         "2" {
             InstallHandler -AppID "Mozilla.Firefox"
         }
         "3" {
-            Clear-Host
             InstallHandler -AppID "Brave.Brave" -ReadableAppID "Brave Browser"
         }
         "q" {
@@ -282,35 +305,31 @@ function InstallingBrowsers {
             Write-Host "Returning to main menu"
             return
         }
-        default {
-            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-            Write-Host "Invalid option."
-            Start-Sleep 1
-            continue
-        }
        }
-       
     }
 }
 
 
 function InstallingEssentials {
     while ($true) {
-        $option = InstallMenu
 
-        if ($option -eq "") {
-            Write-Host "You input nothing."
-            Start-Sleep 1
-            continue
-        }
-
-
-        switch ($option.ToLower()) {
+        switch (InstallMenu) {
         "1" {
+            Clear-Host
             Write-Host "Opening browser installation menu"
             InstallingBrowsers
         }
         "2" {
+            Clear-Host
+            Write-Host "Coming soon" -ForegroundColor Yellow
+            continue
+        }
+        "3" {
+            Clear-Host
+            Write-Host "Coming soon" -ForegroundColor Yellow
+            continue
+        }
+        "4" {
             Clear-Host
             Write-Host "Coming soon" -ForegroundColor Yellow
             continue
@@ -320,40 +339,10 @@ function InstallingEssentials {
             Write-Host "Returning to main menu"
             return
         }
-        default {
-            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-            Write-Host "Invalid option."
-            continue
-        }
        }
-       
     }
 }
 
-function RevertChanges {
-
-    while ($true) {
-        Clear-Host
-        Write-Host "kostikasz IT support quick kit
-
-Want to revert changes? Make sure you don't have unsaved work:
-Choose an option:
-[Y] Y (Yes)     [Y] N (No)
-
-       "
-        $choice = Read-Host 'Enter choice'
-
-        switch ($choice.ToLower()) {
-            'y' { return $true }
-            'n' { return $false }
-            default {
-                Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-                Write-Host "Invalid option."
-                continue
-            }
-        }
-    }
-}
 
 function RegistryHandler {
     param (
@@ -362,8 +351,8 @@ function RegistryHandler {
         $RegPath,
 
         [Parameter(Mandatory=$false)]
-        [Boolean]
-        $Revert=$false,
+        [string]
+        $Revert='n',
 
         [Parameter(Mandatory=$true)]
         [string]
@@ -371,7 +360,7 @@ function RegistryHandler {
     )
     
  
-    if (-not (Confirm)) {
+    if ((ConfirmPrompt) -eq 'n') {
         return
     }
     Clear-Host
@@ -384,7 +373,7 @@ function RegistryHandler {
         }
         Write-Log -Type VERBOSE -Message "The registry already exists. Query outputed $RegStatus"
         Write-Host "ERROR. The fix is already applied." -ForegroundColor Red
-        if (RevertChanges) {    # Calling menu for reverting changes
+        if ((RevertChanges) -eq 'y') {    # Calling menu for reverting changes
             Write-Log -Message "Reverting $FixName fix."
             Write-Log -Message "Reverting $FixName fix at the request of user"
             Write-Host "Reverting $FixName fix"
@@ -417,17 +406,10 @@ function RegistryHandler {
 
 function ApplyFixes {
     while ($true) {
-        $option = FixMenu
 
-        if ($option -eq "") {
-            Write-Host "You input nothing."
-            Start-Sleep 1
-            continue
-        }
-
-
-        switch ($option.ToLower()) {
+        switch (FixMenu) {
         "1" {
+            Clear-Host
             RegistryHandler -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu"
             }
         
@@ -441,36 +423,18 @@ function ApplyFixes {
             Write-Host "Returning to main menu"
             return
         }
-        default {
-            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-            Write-Host "Invalid option."
-            Start-Sleep 1
-            continue
-        }
        }
-       
+
     }
 }
 
 
-
-
-
-
 # Main loop of the starting menu
+Clear-Host
 
 while ($true) {
-    Clear-Host
-    $option = ""
-    $option = StartingMenu
-    if ($option -eq "") {
-        Write-Log -Type WARNING -Message "User inputed nothing into the menu prompt, retrying"
-        Write-Host "You input nothing."
-        Start-Sleep 1
-        continue
-    }
-
-    switch ($option.ToLower()) {
+    
+    switch (StartingMenu) {
         "1" {
                 Clear-Host
                 Write-Host "Opening essential app installation menu"
@@ -482,15 +446,10 @@ while ($true) {
                 ApplyFixes
         }
         "q" {
+                Clear-Host
                 Write-Log -Message "User quit the script from the menu."
                 Write-Host "Goodbye!"
             exit
-        }
-            default {
-            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-            Write-Host "Invalid option."
-            Start-Sleep 1
-            return
         }
     }
 }
