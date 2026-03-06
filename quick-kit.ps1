@@ -4,13 +4,18 @@
 param (
     [Parameter(Mandatory=$false)]
     [Switch]
-    $EnableVerbose
+    $EnableVerbose,
+
+    [Parameter(Mandatory=$false)]
+    [Switch]
+    $EnableSilent
 )
 
 $ErrorActionPreference = 'Stop'
 
 # Global variables
 $Global:VerboseEnabled = $EnableVerbose.IsPresent
+$Global:SilentEnabled = $EnableSilent.IsPresent
 $Script:LogFile = Join-Path -Path '.\logs\' -ChildPath "$(Split-Path $PSCommandPath -Leaf) - $(Get-Date -f 'yyyy-MM-dd_HH-mm-ss').log"
 $Global:ExplorerKilled = $false
 
@@ -92,7 +97,11 @@ function Write-Log {
 Write-Log -Message "Script Successfully started"
 
 if ($Global:VerboseEnabled) {
-    Write-Log -Type VERBOSE -Message "Verbose logging is enabled"
+    Write-Log -Message "Verbose logging is enabled"
+}
+
+if ($Global:SilentEnabled) {
+    Write-Log -Message "Silent mode is enabled"
 }
 
 # Check for admin rights
@@ -235,11 +244,14 @@ function InstallHandler {
     if (-not $Global:VerboseEnabled) {
         Write-Log -Message "Installing $ReadableAppID"
     }
-    Write-Log -Type VERBOSE -Message "Installing $ReadableAppID via winget install -e --id $AppID --source=$Source"
 
-
-    $result = winget.exe install -e --id $AppID --source=$Source 2>&1
-
+    if ($Global:SilentEnabled) {
+        Write-Log -Type VERBOSE -Message "Installing $ReadableAppID via winget install -e --id $AppID --source=$Source > $null 2>&1"
+        winget.exe install -e --id $AppID --source=$Source > $null 2>&1
+    } else {
+        Write-Log -Type VERBOSE -Message "Installing $ReadableAppID via winget install -e --id $AppID --source=$Source"
+        winget.exe install -e --id $AppID --source=$Source
+    }
 
     $friendly_message=$exitMessages[$LASTEXITCODE]
 
@@ -254,14 +266,11 @@ function InstallHandler {
         Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE. $friendly_message"
         Write-Warning "Failed to install $ReadableAppID. $friendly_message"
     } else {
-        # Fallback: scrapes a useful line from winget's own output
-        $wingetError = $result | Where-Object { $_ -match "error|failed|invalid" } | Select-Object -Last 1
-        $fallback = if ($wingetError) { $wingetError.ToString().Trim() } else { "Unknown error (code: $LASTEXITCODE)" }
         if (-not $Global:VerboseEnabled) {
-            Write-Log -Type ERROR -Message "Failed to install $ReadableAppID. $fallback"
+            Write-Log -Type $logType -Message "Failed to install $ReadableAppID. Unknown error code: $LASTEXITCODE"
         }
-        Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE. $fallback Please create an issue report with the error code."
-        Write-Warning "Installation failed: $fallback"
+        Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget. Unknown error code: '$LASTEXITCODE'. Please submit an issue."
+        Write-Warning "Failed to install $ReadableAppID. Unknown error code: $LASTEXITCODE"
     }
     Start-Sleep 3
 }
@@ -338,62 +347,73 @@ function RegistryHandler {
         $FixName
     )
     
- 
-    if ((ConfirmPrompt) -eq 'n') {
-        return
-    }
     Clear-Host
-    # Checking if registery already exists
-    Write-Log -Type VERBOSE -Message "Checking if registry already exists by running query at $RegPath"
-    $RegStatus=reg.exe query $RegPath
-    if ($RegStatus) {
-        if (-not $Global:VerboseEnabled) {
-            Write-Log -Type ERROR -Message "The fix is already applied."
-        }
-        Write-Log -Type VERBOSE -Message "The registry already exists. Query outputed'$RegStatus'"
-        Write-Warning "The fix is already applied." 
-        if ((RevertChanges) -eq 'y') {    # Calling menu for reverting changes
-            Write-Log -Message "Reverting $FixName fix."
-            Write-Log -Message "Reverting $FixName fix at the request of user"
-            Write-Host "Reverting $FixName fix"
-            Write-Log -Type VERBOSE -Message "Trying to delete registry at $RegPath"
-            try {
-                Write-Log -Type VERBOSE -Message "Deleted registry at $RegPath"
+ 
+    if ($Global:SilentEnabled -or (ConfirmPrompt) -eq 'y') {
+        # Checking if registery already exists
+        Write-Log -Type VERBOSE -Message "Checking if registry already exists by running query at $RegPath"
+        $RegStatus=reg.exe query $RegPath
+        if ($RegStatus) {
+            if (-not $Global:VerboseEnabled) {
+                Write-Log -Type ERROR -Message "The fix is already applied."
+            }
+            Write-Log -Type VERBOSE -Message "The registry already exists. Query outputed'$RegStatus'"
+            Write-Warning "The fix is already applied."
+
+            if ($Global:SilentEnabled -or (RevertChanges) -eq 'y') {    # Calling menu for reverting changes
+                Write-Log -Message "Reverting $FixName fix."
+                Write-Log -Message "Reverting $FixName fix at the request of user"
+                Write-Host "Reverting $FixName fix"
+                Write-Log -Type VERBOSE -Message "Trying to delete registry at $RegPath"
+                try {
+                    Write-Log -Type VERBOSE -Message "Deleted registry at $RegPath"
+                    Write-Log -Type VERBOSE -Message "Restarting Windows Explorer"
+                    $Global:ExplorerKilled = $true
+                    Stop-Process -ProcessName explorer -Force #TODO make silent
+                    Start-Process explorer
+                    $Global:ExplorerKilled = $false
+                    Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
+                } finally {
+                    if ($Global:ExplorerKilled) {
+                        # Explorer was killed but never restarted
+                        Write-Log -Type WARNING -Message "Explorer was killed but never restarted, trying to restart..."
+                        Start-Process explorer
+                        Write-Log -Message "Explorer was restarted"
+                    }
+                }
+
+                if ($Global:SilentEnabled) {
+                    reg.exe delete $RegPath /f /ve | Out-Null
+                } else {
+                    reg.exe delete $RegPath /f /ve
+                }
+
+
+
+                Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
+                Write-Log -Message "SUCCESS, reverted $FixName fix."
+                Write-Host "Fix deleted successfully, returning to menu"
+            }
+        } else {
+                #Make it check if the registery edit already exists #TODO: FIX NO FALLBACK EXPLORER
+                Write-Log -Message "Applying $FixName fix."
+                Write-Host "Applying $FixName fix"
+                Write-Log -Type VERBOSE -Message "Trying to add registry at $RegPath"
+                reg.exe add $RegPath /f /ve
+                Write-Log -Type VERBOSE -Message "Added registry at $RegPath" #TODO create check and error handling
                 Write-Log -Type VERBOSE -Message "Restarting Windows Explorer"
-                $Global:ExplorerKilled = $true
                 Stop-Process -ProcessName explorer -Force #TODO make silent
                 Start-Process explorer
-                $Global:ExplorerKilled = $false
                 Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
-            } finally {
-                if ($Global:ExplorerKilled) {
-                    # Explorer was killed but never restarted
-                    Write-Log -Type WARNING -Message "Explorer was killed but never restarted, trying to restart..."
-                    Start-Process explorer
-                    Write-Log -Message "Explorer was restarted"
-                }
-            }
-            reg.exe delete $RegPath /f /ve
-
-            Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
-            Write-Log -Message "SUCCESS, reverted $FixName fix."
-            Write-Host "Fix deleted successfully, returning to menu"
+                Write-Log -Message "SUCCESS, applied $FixName fix."
+                Write-Host "Fix applied Successfully, returning to menu"
         }
+        Start-Sleep 2
     } else {
-            #Make it check if the registery edit already exists
-            Write-Log -Message "Applying $FixName fix."
-            Write-Host "Applying $FixName fix"
-            Write-Log -Type VERBOSE -Message "Trying to add registry at $RegPath"
-            reg.exe add $RegPath /f /ve
-            Write-Log -Type VERBOSE -Message "Added registry at $RegPath" #TODO create check and error handling
-            Write-Log -Type VERBOSE -Message "Restarting Windows Explorer"
-            Stop-Process -ProcessName explorer -Force #TODO make silent
-            Start-Process explorer
-            Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
-            Write-Log -Message "SUCCESS, applied $FixName fix."
-            Write-Host "Fix applied Successfully, returning to menu"
+        return
     }
-    Start-Sleep 2
+ 
+
 }
 
 function ApplyFixes {
