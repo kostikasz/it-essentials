@@ -453,6 +453,7 @@ while ($true) {
                 ApplyFixes
         }
         "q" {
+                Write-Log "User quit the script from the menu."
                 Write-Host "Goodbye!"
             exit
         }
