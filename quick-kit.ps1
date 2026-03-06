@@ -202,6 +202,21 @@ function InstallHandler {
         [String]
         $ReadableAppID = $AppID.Replace("."," ")
     )
+
+    $exitMessages = @{
+    0          = $null   # Success
+    -1978335212 = "The installer was cancelled or interrupted. Please try again."
+    -1978335189 = "'$ReadableAppID' is already installed and up to date."
+    -1978335203 = "'$ReadableAppID' is already installed and up to date."
+    -1978335191 = "There are multiple packages matching '$AppID'. Try narrowing the source or using the full package ID."
+    -1978335215 = "Insufficient permissions. Contact your system administrator."
+    -1978335180 = "Download failed. Check your internet connection and try again."
+    -1978335179 = "The installer hash did not match. The package may be corrupted or tampered with."
+    -1978335163 = "Disk space is insufficient to install '$ReadableAppID'."
+    }
+
+    $warningCodes = @(-1978335189, -1978335203)
+
     Clear-Host
     Write-Host "Installing $ReadableAppID"
     if (-not $Global:VerboseEnabled) {
@@ -209,17 +224,31 @@ function InstallHandler {
     }
     Write-Log -Type VERBOSE -Message "Installing $ReadableAppID via winget install -e --id $AppID --source=$Source"
 
-    winget.exe install -e --id $AppID --source=$Source
+
+    $result = winget.exe install -e --id $AppID --source=$Source 2>&1
+
+
+    $friendly_message=$exitMessages[$LASTEXITCODE]
 
     if ($LASTEXITCODE -eq 0) {
         Write-Log -Message "Successfully installed $ReadableAppID"
         Write-Host "Successfully installed $ReadableAppID, returning to essential app install menu" -ForegroundColor Green
-    } elseif (-not $Global:VerboseEnabled) {
-        Write-Log -Type ERROR -Message "Failed to install $ReadableAppID, suggesting to retry installation"
-        Write-Host "Failed to install $ReadableAppID."
+    } elseif ($friendly_message) {
+        $logType = if ($LASTEXITCODE -in $warningCodes) { 'WARNING' } else { 'ERROR' }
+        if (-not $Global:VerboseEnabled) {
+            Write-Log -Type $logType -Message "Failed to install $ReadableAppID. $friendly_message"
+        }
+        Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE. $friendly_message"
+        Write-Warning "Failed to install $ReadableAppID. $friendly_message"
     } else {
-        Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE, suggesting to retry installation"
-        Write-Host "Failed to install $ReadableAppID."
+        # Fallback: scrape a useful line from winget's own output
+        $wingetError = $result | Where-Object { $_ -match "error|failed|invalid" } | Select-Object -Last 1
+        $fallback = if ($wingetError) { $wingetError.ToString().Trim() } else { "Unknown error (code: $LASTEXITCODE)" }
+        if (-not $Global:VerboseEnabled) {
+            Write-Log -Type ERROR -Message "Failed to install $ReadableAppID. $fallback"
+        }
+        Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE. $fallback Please create an issue report with the error code."
+        Write-Warning "Installation failed: $fallback"
     }
     Start-Sleep 3
 }
