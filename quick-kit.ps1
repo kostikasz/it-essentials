@@ -1,16 +1,42 @@
 # https://github.com/kostikasz
 
+
 param (
     [Parameter(Mandatory=$false)]
     [Switch]
     $EnableVerbose
 )
 
+$ErrorActionPreference = 'Stop'
 
-
-# Global settings
+# Global variables
 $Global:VerboseEnabled = $EnableVerbose.IsPresent
 $Script:LogFile = Join-Path -Path '.\logs\' -ChildPath "$(Split-Path $PSCommandPath -Leaf) - $(Get-Date -f 'yyyy-MM-dd_HH-mm-ss').log"
+$Global:ExplorerKilled = $false
+
+function MenuHandler {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string[]]
+        $ValidOptions # Should all be passed in lower-case
+    )
+    
+    while ($true) {
+        $option = (Read-Host "Enter choice").ToLower().Trim()
+
+        if ($option -eq "") {
+            Write-Log -Type WARNING -Message "User inputed nothing into the menu prompt, retrying"
+            Write-Host "You input nothing."
+            continue
+        } elseif ($option -notin $ValidOptions) {
+            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
+            Write-Host "Invalid option."
+            continue
+        } else {
+            return $option
+        }
+    }
+}
 
 function Write-Log {
     [CmdletBinding()]
@@ -69,17 +95,6 @@ if ($Global:VerboseEnabled) {
     Write-Log -Type VERBOSE -Message "Verbose logging is enabled"
 }
 
-
-<# Usage
-# With the default values
-Write-Log -Message "This is a message"
-# Passing values for some parameters
-Write-Log -Type Warning -Message "this is a warning message"
-# Passing all values for parameters
-Write-Log -Path C:\OtherPath -LogName "MyLog.txt" -Type Error -Message This is a error message"
-#>
-
-
 # Check for admin rights
 Write-Log -Type VERBOSE -Message "Checking if the user has admin permisssions with Windows Identity"
 
@@ -115,7 +130,7 @@ Choose an option:
 [Q] Quit
 
 "
-    return Read-Host "Enter choice: " # Function returns the choice
+    return MenuHandler -ValidOptions '1','2','q' # Function returns the choice
 }
 
 function InstallMenu {
@@ -129,12 +144,12 @@ Choose an option:
 [4] Other
 [Q] Quit to main menu
 
-       "
-       return Read-Host "Enter choice: " # Function returns the choice
+"
+    return MenuHandler -ValidOptions '1','2','3','4','q' # Function returns the choice
 }
 
 function InstallMenuBrowsers {
-       Write-Host "kostikasz IT support quick kit
+    Write-Host "kostikasz IT support quick kit
 
 BROWSERS INSTALLATION
 Choose an option:
@@ -143,8 +158,8 @@ Choose an option:
 [3] Brave
 [Q] Quit to main menu
 
-       "
-       return Read-Host "Enter choice: " # Function returns the choice
+"
+    return MenuHandler -ValidOptions '1','2','3','q' # Function returns the choice
 }
 
 function FixMenu {
@@ -156,36 +171,34 @@ Choose an option:
 [2] Coming Soon
 [Q] Quit to main menu
 
-       "
-       return Read-Host "Enter choice: " # Function returns the choice
+"
+    return MenuHandler -ValidOptions '1','2','q' # Function returns the choice
 }
 
 
-function Confirm {
-
-    while ($true) {
-        Clear-Host
-        Write-Host "kostikasz IT support quick kit
+function ConfirmPrompt {
+    Write-Host "kostikasz IT support quick kit
 
 Are you sure? Make sure you don't have unsaved work.:
 Choose an option:
 [Y] Y (Yes)     [N] N (No)
 
-       "
-        $choice = Read-Host 'Enter choice'
-
-        switch ($choice.ToLower()) {
-            'y' { return $true }
-            'n' { return $false }
-            default {
-                Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-                Write-Host "Invalid option."
-                Start-Sleep 1
-                continue
-            }
-        }
-    }
+"
+    return MenuHandler -ValidOptions 'y','n' # Function returns the choice
 }
+
+function RevertChanges {
+
+    Write-Host "kostikasz IT support quick kit
+
+Want to revert changes? Make sure you don't have unsaved work:
+Choose an option:
+[Y] Y (Yes)     [N] N (No)
+
+"
+    return MenuHandler -ValidOptions 'y','n' # Function returns the choice
+}
+
 
 function InstallHandler {
     param (
@@ -202,6 +215,21 @@ function InstallHandler {
         [String]
         $ReadableAppID = $AppID.Replace("."," ")
     )
+
+    $exitMessages = @{
+    0          = $null   # Success
+    -1978335212 = "The installer was cancelled or interrupted. Please try again."
+    -1978335189 = "'$ReadableAppID' is already installed and up to date."
+    -1978335203 = "'$ReadableAppID' is already installed and up to date."
+    -1978335191 = "There are multiple packages matching '$AppID'. Try narrowing the source or using the full package ID."
+    -1978335215 = "Insufficient permissions. Contact your system administrator."
+    -1978335180 = "Download failed. Check your internet connection and try again."
+    -1978335179 = "The installer hash did not match. The package may be corrupted or tampered with."
+    -1978335163 = "Disk space is insufficient to install '$ReadableAppID'."
+    }
+
+    $warningCodes = @(-1978335189, -1978335203)
+
     Clear-Host
     Write-Host "Installing $ReadableAppID"
     if (-not $Global:VerboseEnabled) {
@@ -209,43 +237,46 @@ function InstallHandler {
     }
     Write-Log -Type VERBOSE -Message "Installing $ReadableAppID via winget install -e --id $AppID --source=$Source"
 
-    winget.exe install -e --id $AppID --source=$Source
+
+    $result = winget.exe install -e --id $AppID --source=$Source 2>&1
+
+
+    $friendly_message=$exitMessages[$LASTEXITCODE]
 
     if ($LASTEXITCODE -eq 0) {
         Write-Log -Message "Successfully installed $ReadableAppID"
         Write-Host "Successfully installed $ReadableAppID, returning to essential app install menu" -ForegroundColor Green
-    } elseif (-not $Global:VerboseEnabled) {
-        Write-Log -Type ERROR -Message "Failed to install $ReadableAppID, suggesting to retry installation"
-        Write-Host "Failed to install $ReadableAppID."
+    } elseif ($friendly_message) {
+        $logType = if ($LASTEXITCODE -in $warningCodes) { 'WARNING' } else { 'ERROR' }
+        if (-not $Global:VerboseEnabled) {
+            Write-Log -Type $logType -Message "Failed to install $ReadableAppID. $friendly_message"
+        }
+        Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE. $friendly_message"
+        Write-Warning "Failed to install $ReadableAppID. $friendly_message"
     } else {
-        Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE, suggesting to retry installation"
-        Write-Host "Failed to install $ReadableAppID."
+        # Fallback: scrapes a useful line from winget's own output
+        $wingetError = $result | Where-Object { $_ -match "error|failed|invalid" } | Select-Object -Last 1
+        $fallback = if ($wingetError) { $wingetError.ToString().Trim() } else { "Unknown error (code: $LASTEXITCODE)" }
+        if (-not $Global:VerboseEnabled) {
+            Write-Log -Type ERROR -Message "Failed to install $ReadableAppID. $fallback"
+        }
+        Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE. $fallback Please create an issue report with the error code."
+        Write-Warning "Installation failed: $fallback"
     }
     Start-Sleep 3
 }
 
 function InstallingBrowsers {
     while ($true) {
-        Clear-Host
-        $option = InstallMenuBrowsers
 
-        if ($option -eq "") {
-            Write-Host "You input nothing."
-            Start-Sleep 1
-            continue
-        }
-
-
-        switch ($option.ToLower()) {
+        switch (InstallMenuBrowsers) {
         "1" {
-            Clear-Host
             InstallHandler -AppID "Google.Chrome"
         }
         "2" {
             InstallHandler -AppID "Mozilla.Firefox"
         }
         "3" {
-            Clear-Host
             InstallHandler -AppID "Brave.Brave" -ReadableAppID "Brave Browser"
         }
         "q" {
@@ -253,35 +284,31 @@ function InstallingBrowsers {
             Write-Host "Returning to main menu"
             return
         }
-        default {
-            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-            Write-Host "Invalid option."
-            Start-Sleep 1
-            continue
-        }
        }
-       
     }
 }
 
 
 function InstallingEssentials {
     while ($true) {
-        $option = InstallMenu
 
-        if ($option -eq "") {
-            Write-Host "You input nothing."
-            Start-Sleep 1
-            continue
-        }
-
-
-        switch ($option.ToLower()) {
+        switch (InstallMenu) {
         "1" {
+            Clear-Host
             Write-Host "Opening browser installation menu"
             InstallingBrowsers
         }
         "2" {
+            Clear-Host
+            Write-Host "Coming soon" -ForegroundColor Yellow
+            continue
+        }
+        "3" {
+            Clear-Host
+            Write-Host "Coming soon" -ForegroundColor Yellow
+            continue
+        }
+        "4" {
             Clear-Host
             Write-Host "Coming soon" -ForegroundColor Yellow
             continue
@@ -291,40 +318,10 @@ function InstallingEssentials {
             Write-Host "Returning to main menu"
             return
         }
-        default {
-            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-            Write-Host "Invalid option."
-            continue
-        }
        }
-       
     }
 }
 
-function RevertChanges {
-
-    while ($true) {
-        Clear-Host
-        Write-Host "kostikasz IT support quick kit
-
-Want to revert changes? Make sure you don't have unsaved work:
-Choose an option:
-[Y] Y (Yes)     [Y] N (No)
-
-       "
-        $choice = Read-Host 'Enter choice'
-
-        switch ($choice.ToLower()) {
-            'y' { return $true }
-            'n' { return $false }
-            default {
-                Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-                Write-Host "Invalid option."
-                continue
-            }
-        }
-    }
-}
 
 function RegistryHandler {
     param (
@@ -333,8 +330,8 @@ function RegistryHandler {
         $RegPath,
 
         [Parameter(Mandatory=$false)]
-        [Boolean]
-        $Revert=$false,
+        [string]
+        $Revert='n',
 
         [Parameter(Mandatory=$true)]
         [string]
@@ -342,7 +339,7 @@ function RegistryHandler {
     )
     
  
-    if (-not (Confirm)) {
+    if ((ConfirmPrompt) -eq 'n') {
         return
     }
     Clear-Host
@@ -353,18 +350,31 @@ function RegistryHandler {
         if (-not $Global:VerboseEnabled) {
             Write-Log -Type ERROR -Message "The fix is already applied."
         }
-        Write-Log -Type VERBOSE -Message "The registry already exists. Query outputed $RegStatus"
-        Write-Host "ERROR. The fix is already applied." -ForegroundColor Red
-        if (RevertChanges) {    # Calling menu for reverting changes
+        Write-Log -Type VERBOSE -Message "The registry already exists. Query outputed'$RegStatus'"
+        Write-Warning "The fix is already applied." 
+        if ((RevertChanges) -eq 'y') {    # Calling menu for reverting changes
             Write-Log -Message "Reverting $FixName fix."
             Write-Log -Message "Reverting $FixName fix at the request of user"
             Write-Host "Reverting $FixName fix"
             Write-Log -Type VERBOSE -Message "Trying to delete registry at $RegPath"
+            try {
+                Write-Log -Type VERBOSE -Message "Deleted registry at $RegPath"
+                Write-Log -Type VERBOSE -Message "Restarting Windows Explorer"
+                $Global:ExplorerKilled = $true
+                Stop-Process -ProcessName explorer -Force #TODO make silent
+                Start-Process explorer
+                $Global:ExplorerKilled = $false
+                Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
+            } finally {
+                if ($Global:ExplorerKilled) {
+                    # Explorer was killed but never restarted
+                    Write-Log -Type WARNING -Message "Explorer was killed but never restarted, trying to restart..."
+                    Start-Process explorer
+                    Write-Log -Message "Explorer was restarted"
+                }
+            }
             reg.exe delete $RegPath /f /ve
-            Write-Log -Type VERBOSE -Message "Deleted registry at $RegPath"
-            Write-Log -Type VERBOSE -Message "Restarting Windows Explorer"
-            Stop-Process -ProcessName explorer -Force #TODO make silent
-            Start-Process explorer
+
             Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
             Write-Log -Message "SUCCESS, reverted $FixName fix."
             Write-Host "Fix deleted successfully, returning to menu"
@@ -388,17 +398,10 @@ function RegistryHandler {
 
 function ApplyFixes {
     while ($true) {
-        $option = FixMenu
 
-        if ($option -eq "") {
-            Write-Host "You input nothing."
-            Start-Sleep 1
-            continue
-        }
-
-
-        switch ($option.ToLower()) {
+        switch (FixMenu) {
         "1" {
+            Clear-Host
             RegistryHandler -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu"
             }
         
@@ -412,36 +415,18 @@ function ApplyFixes {
             Write-Host "Returning to main menu"
             return
         }
-        default {
-            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-            Write-Host "Invalid option."
-            Start-Sleep 1
-            continue
-        }
        }
-       
+
     }
 }
 
 
-
-
-
-
 # Main loop of the starting menu
+Clear-Host
 
 while ($true) {
-    Clear-Host
-    $option = ""
-    $option = StartingMenu
-    if ($option -eq "") {
-        Write-Log -Type WARNING -Message "User inputed nothing into the menu prompt, retrying"
-        Write-Host "You input nothing."
-        Start-Sleep 1
-        continue
-    }
-
-    switch ($option.ToLower()) {
+    
+    switch (StartingMenu) {
         "1" {
                 Clear-Host
                 Write-Host "Opening essential app installation menu"
@@ -453,15 +438,10 @@ while ($true) {
                 ApplyFixes
         }
         "q" {
+                Clear-Host
                 Write-Log -Message "User quit the script from the menu."
                 Write-Host "Goodbye!"
             exit
-        }
-            default {
-            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
-            Write-Host "Invalid option."
-            Start-Sleep 1
-            return
         }
     }
 }
