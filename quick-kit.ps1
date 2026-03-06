@@ -1,16 +1,18 @@
 # https://github.com/kostikasz
 
+
 param (
     [Parameter(Mandatory=$false)]
     [Switch]
     $EnableVerbose
 )
 
+$ErrorActionPreference = 'Stop'
 
-
-# Global settings
+# Global variables
 $Global:VerboseEnabled = $EnableVerbose.IsPresent
 $Script:LogFile = Join-Path -Path '.\logs\' -ChildPath "$(Split-Path $PSCommandPath -Leaf) - $(Get-Date -f 'yyyy-MM-dd_HH-mm-ss').log"
+$Global:ExplorerKilled = $false
 
 function MenuHandler {
     param(
@@ -371,18 +373,32 @@ function RegistryHandler {
         if (-not $Global:VerboseEnabled) {
             Write-Log -Type ERROR -Message "The fix is already applied."
         }
-        Write-Log -Type VERBOSE -Message "The registry already exists. Query outputed $RegStatus"
-        Write-Host "ERROR. The fix is already applied." -ForegroundColor Red
+        Write-Log -Type VERBOSE -Message "The registry already exists. Query outputed'$RegStatus'"
+        Write-Warning "The fix is already applied." 
         if ((RevertChanges) -eq 'y') {    # Calling menu for reverting changes
             Write-Log -Message "Reverting $FixName fix."
             Write-Log -Message "Reverting $FixName fix at the request of user"
             Write-Host "Reverting $FixName fix"
             Write-Log -Type VERBOSE -Message "Trying to delete registry at $RegPath"
+            try {
+                Write-Log -Type VERBOSE -Message "Deleted registry at $RegPath"
+                Write-Log -Type VERBOSE -Message "Restarting Windows Explorer"
+                $Global:ExplorerKilled = $true
+                Stop-Process -ProcessName explorer -Force #TODO make silent
+                Start-Sleep 10 #asdjadjaisdjiajd
+                Start-Process explorer
+                $Global:ExplorerKilled = $false
+                Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
+            } finally {
+                if ($Global:ExplorerKilled) {
+                    # Explorer was killed but never restarted
+                    Write-Log -Type WARNING -Message "Explorer was killed but never restarted, trying to restart..."
+                    Start-Process explorer
+                    Write-Log -Message "Explorer was restarted"
+                }
+            }
             reg.exe delete $RegPath /f /ve
-            Write-Log -Type VERBOSE -Message "Deleted registry at $RegPath"
-            Write-Log -Type VERBOSE -Message "Restarting Windows Explorer"
-            Stop-Process -ProcessName explorer -Force #TODO make silent
-            Start-Process explorer
+
             Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
             Write-Log -Message "SUCCESS, reverted $FixName fix."
             Write-Host "Fix deleted successfully, returning to menu"
