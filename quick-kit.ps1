@@ -202,6 +202,11 @@ Choose an option:
     
 }
 
+function InfoExitMenu {
+    Write-Host "To exit enter: [Q]"
+    return MenuHandler -ValidOptions 'q' # Function returns the choice
+}
+
 function ConfirmPrompt {
     Write-Host "kostikasz IT support quick kit
 
@@ -456,14 +461,22 @@ function ApplyFixes {
 
     }
 }
+function GetOS {
+
+    Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, OSArchitecture | Out-Host
+    if ((InfoExitMenu) -eq "q") {
+        return
+    }
+
+}
 
 function SystemInfo {
     while ($true) {
-
         switch (SystemMenu) {
         "1" {
             Clear-Host
             GetOS
+            continue
             }
         
         "2" {
