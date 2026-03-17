@@ -479,6 +479,15 @@ function GetCPU {
 
 }
 
+function GetRAM {
+
+    Get-CimInstance Win32_PhysicalMemory | Select-Object BankLabel, Capacity, DeviceLocator, FormFactor, Manufacturer, PartNumber, SerialNumber, Speed | Out-Host
+    if ((InfoExitMenu) -eq "q") {
+        return
+    }
+
+}
+
 function SystemInfo {
     while ($true) {
         switch (SystemMenu) {
