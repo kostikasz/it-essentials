@@ -470,6 +470,15 @@ function GetOS {
 
 }
 
+function GetCPU {
+
+    Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed | Out-Host
+    if ((InfoExitMenu) -eq "q") {
+        return
+    }
+
+}
+
 function SystemInfo {
     while ($true) {
         switch (SystemMenu) {
