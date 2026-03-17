@@ -471,24 +471,46 @@ function GetOS {
 }
 
 function GetCPU {
+    Get-CimInstance Win32_Processor |
+        Select-Object Name, NumberOfCores, NumberOfLogicalProcessors,
+            # ITE-79 contribution: convert raw clock value to a readable GHz format
+            @{ Name = "MaxClockSpeedGHz"; Expression = { "{0:N2} GHz" -f ($_.MaxClockSpeed / 1000) } } |
+        Out-Host
 
-    Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed | Out-Host
     if ((InfoExitMenu) -eq "q") {
         return
     }
-
 }
-
 function GetRAM {
+    Get-CimInstance Win32_PhysicalMemory | Select-Object BankLabel, DeviceLocator,
+        # ITE-79 contribution: convert raw capacity values to a readable format
+        @{Name="Capacity"; Expression={
+            $gb = [math]::Round($_.Capacity / 1GB, 2)
+            $tb = [math]::Round($_.Capacity / 1TB, 2)
+            if ($tb -ge 1) { "$tb TB" } else { "$gb GB" }
+        }},
+        @{Name="FormFactor"; Expression={
+            switch ($_.FormFactor) {
+                8  { "DIMM" }
+                12 { "SODIMM" }
+                0  { "Unknown" }
+                default { "Other ($_)" }
+            }
+        }},
+        Manufacturer, PartNumber, SerialNumber,
+        @{Name="Speed (MHz)"; Expression={ "$($_.Speed) MHz" }} | Out-Host
 
-    Get-CimInstance Win32_PhysicalMemory | Select-Object BankLabel, Capacity, DeviceLocator, FormFactor, Manufacturer, PartNumber, SerialNumber, Speed | Out-Host
     if ((InfoExitMenu) -eq "q") {
         return
     }
-
 }
 function GetDisk {
-    Get-CimInstance Win32_DiskDrive | Select-Object Caption, Description, DeviceID, Model, SerialNumber, Size | Out-Host
+    Get-CimInstance Win32_DiskDrive | Select-Object Caption, Description, DeviceID, Model, SerialNumber, 
+    @{Name="Size"; Expression={
+        $gb = [math]::Round($_.Size / 1GB, 2)
+        $tb = [math]::Round($_.Size / 1TB, 2)
+        if ($tb -ge 1) { "$tb TB" } else { "$gb GB" }
+    }} | Out-Host
     if ((InfoExitMenu) -eq "q") {
         return
     }
