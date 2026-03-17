@@ -487,6 +487,12 @@ function GetRAM {
     }
 
 }
+function GetDisk {
+    Get-CimInstance Win32_DiskDrive | Select-Object Caption, Description, DeviceID, Model, SerialNumber, Size | Out-Host
+    if ((InfoExitMenu) -eq "q") {
+        return
+    }
+}
 
 function SystemInfo {
     while ($true) {
