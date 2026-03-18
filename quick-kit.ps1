@@ -361,10 +361,6 @@ function RegistryHandler {
         [String]
         $RegPath,
 
-        [Parameter(Mandatory=$false)]
-        [string]
-        $Revert='n',
-
         [Parameter(Mandatory=$true)]
         [string]
         $FixName
@@ -385,51 +381,43 @@ function RegistryHandler {
 
             if ($Global:SilentEnabled -or (RevertChanges) -eq 'y') {    # Calling menu for reverting changes
                 Write-Log -Message "Reverting $FixName fix."
-                Write-Log -Message "Reverting $FixName fix at the request of user"
                 Write-Host "Reverting $FixName fix"
+                
                 Write-Log -Type VERBOSE -Message "Trying to delete registry at $RegPath"
-                try {
-                    Write-Log -Type VERBOSE -Message "Deleted registry at $RegPath"
-                    Write-Log -Type VERBOSE -Message "Restarting Windows Explorer"
-                    $Global:ExplorerKilled = $true
-                    Stop-Process -ProcessName explorer -Force #TODO make silent
-                    Start-Process explorer
-                    $Global:ExplorerKilled = $false
-                    Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
-                } finally {
-                    if ($Global:ExplorerKilled) {
-                        # Explorer was killed but never restarted
-                        Write-Log -Type WARNING -Message "Explorer was killed but never restarted, trying to restart..."
-                        Start-Process explorer
-                        Write-Log -Message "Explorer was restarted"
-                    }
-                }
-
                 if ($Global:SilentEnabled) {
                     reg.exe delete $RegPath /f /ve | Out-Null
                 } else {
                     reg.exe delete $RegPath /f /ve
                 }
+                Write-Log -Type VERBOSE -Message "Deleted registry at $RegPath"
 
+                    Write-Log -Type VERBOSE -Message "Stopping Windows Explorer"
+                    Stop-Process -ProcessName explorer -Force
+                    Write-Log -Type VERBOSE -Message "Stopped Windows Explorer (auto-restart expected)"
 
-
-                Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
                 Write-Log -Message "SUCCESS, reverted $FixName fix."
-                Write-Host "Fix deleted successfully, returning to menu"
+                Write-Host -ForegroundColor Green "Fix deleted successfully, returning to menu"
             }
         } else {
-                #Make it check if the registery edit already exists #TODO: FIX NO FALLBACK EXPLORER
+                #Make it check if the registery edit already exists
                 Write-Log -Message "Applying $FixName fix."
                 Write-Host "Applying $FixName fix"
+
                 Write-Log -Type VERBOSE -Message "Trying to add registry at $RegPath"
-                reg.exe add $RegPath /f /ve
-                Write-Log -Type VERBOSE -Message "Added registry at $RegPath" #TODO create check and error handling
-                Write-Log -Type VERBOSE -Message "Restarting Windows Explorer"
-                Stop-Process -ProcessName explorer -Force #TODO make silent
-                Start-Process explorer
-                Write-Log -Type VERBOSE -Message "Restarted Windows Explorer"
+                if ($Global:SilentEnabled) {
+                    reg.exe add $RegPath /f /ve | Out-Null
+                } else {
+                    reg.exe add $RegPath /f /ve
+                }
+                Write-Log -Type VERBOSE -Message "Added registry at $RegPath"
+
+
+                Write-Log -Type VERBOSE -Message "Stopping Windows Explorer"
+                Stop-Process -ProcessName explorer -Force
+                Write-Log -Type VERBOSE -Message "Stopped Windows Explorer (auto-restart expected)"
+
                 Write-Log -Message "SUCCESS, applied $FixName fix."
-                Write-Host "Fix applied Successfully, returning to menu"
+                Write-Host -ForegroundColor Green "Fix applied Successfully, returning to menu"
         }
         Start-Sleep 2
     } else {
