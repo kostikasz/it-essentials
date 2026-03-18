@@ -276,12 +276,13 @@ function InstallHandler {
     }
 
     $friendly_message=$exitMessages[$LASTEXITCODE]
+    $logType = if ($LASTEXITCODE -in $warningCodes) { 'WARNING' } else { 'ERROR' }
+
 
     if ($LASTEXITCODE -eq 0) {
         Write-Log -Message "Successfully installed $ReadableAppID"
         Write-Host "Successfully installed $ReadableAppID, returning to essential app install menu" -ForegroundColor Green
     } elseif ($friendly_message) {
-        $logType = if ($LASTEXITCODE -in $warningCodes) { 'WARNING' } else { 'ERROR' }
         if (-not $Global:VerboseEnabled) {
             Write-Log -Type $logType -Message "Failed to install $ReadableAppID. $friendly_message"
         }
