@@ -136,10 +136,11 @@ function StartingMenu {
 Choose an option:
 [1] Install essential apps
 [2] Install fixes
+[3] System information
 [Q] Quit
 
 "
-    return MenuHandler -ValidOptions '1','2','q' # Function returns the choice
+    return MenuHandler -ValidOptions '1','2','3','q' # Function returns the choice
 }
 
 function InstallMenu {
@@ -184,6 +185,27 @@ Choose an option:
     return MenuHandler -ValidOptions '1','2','q' # Function returns the choice
 }
 
+function SystemMenu {
+           Write-Host "kostikasz IT support quick kit
+
+System info module:
+Choose an option:
+[1] OS info
+[2] CPU info
+[3] RAM info
+[4] Disk space info
+[5] Format system info into a file
+[Q] Quit to main menu
+
+"
+    return MenuHandler -ValidOptions '1','2','3','4','5','q' # Function returns the choice
+    
+}
+
+function InfoExitMenu {
+    Write-Host "To exit enter: [Q]"
+    return MenuHandler -ValidOptions 'q' # Function returns the choice
+}
 
 function ConfirmPrompt {
     Write-Host "kostikasz IT support quick kit
@@ -439,6 +461,129 @@ function ApplyFixes {
 
     }
 }
+function GetOS {
+    param([Switch]$Raw)
+    $data = Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, OSArchitecture
+    if ($Raw) { return $data }
+    $data | Out-Host
+    if ((InfoExitMenu) -eq "q") { return }
+}
+
+function GetCPU {
+    param([Switch]$Raw)
+    $data = Get-CimInstance Win32_Processor |
+        Select-Object Name, NumberOfCores, NumberOfLogicalProcessors,
+            @{ Name = "MaxClockSpeedGHz"; Expression = { "{0:N2} GHz" -f ($_.MaxClockSpeed / 1000) } }
+    if ($Raw) { return $data }
+    $data | Out-Host
+    if ((InfoExitMenu) -eq "q") { return }
+}
+
+function GetRAM {
+    param([Switch]$Raw)
+    $data = Get-CimInstance Win32_PhysicalMemory | Select-Object BankLabel, DeviceLocator,
+        @{Name="Capacity"; Expression={
+            $gb = [math]::Round($_.Capacity / 1GB, 2)
+            $tb = [math]::Round($_.Capacity / 1TB, 2)
+            if ($tb -ge 1) { "$tb TB" } else { "$gb GB" }
+        }},
+        @{Name="FormFactor"; Expression={
+            switch ($_.FormFactor) {
+                8  { "DIMM" }
+                12 { "SODIMM" }
+                0  { "Unknown" }
+                default { "Other ($_)" }
+            }
+        }},
+        Manufacturer, PartNumber, SerialNumber,
+        @{Name="Speed (MHz)"; Expression={ "$($_.Speed) MHz" }}
+    if ($Raw) { return $data }
+    $data | Out-Host
+    if ((InfoExitMenu) -eq "q") { return }
+}
+
+function GetDisk {
+    param([Switch]$Raw)
+    $data = Get-CimInstance Win32_DiskDrive | Select-Object Caption, Description, DeviceID, Model, SerialNumber,
+        @{Name="Size"; Expression={
+            $gb = [math]::Round($_.Size / 1GB, 2)
+            $tb = [math]::Round($_.Size / 1TB, 2)
+            if ($tb -ge 1) { "$tb TB" } else { "$gb GB" }
+        }}
+    if ($Raw) { return $data }
+    $data | Out-Host
+    if ((InfoExitMenu) -eq "q") { return }
+}
+
+function OutputSysInfo {
+    $sysInfoDir = "system_info"
+
+    if (-not (Test-Path -Path $sysInfoDir)) {
+        New-Item -Path $sysInfoDir -ItemType Directory -Force | Out-Null
+        Write-Log -Message "Created directory '$sysInfoDir'"
+        Write-Host "Created folder for system information files: '$sysInfoDir'"
+    }
+
+    $files = @{
+        "system_info.csv" = { GetOS -Raw }
+        "cpu_info.csv"    = { GetCPU -Raw }
+        "ram_info.csv"    = { GetRAM -Raw }
+        "disk_info.csv"   = { GetDisk -Raw }
+    }
+
+    foreach ($fileName in $files.Keys) {
+        $filePath = Join-Path $sysInfoDir $fileName
+
+        if (Test-Path -Path $filePath) {
+            Write-Log -Type WARNING -Message "File '$filePath' already exists, replacing it"
+            Write-Host "Replacing existing file: $fileName" -ForegroundColor Yellow
+        }
+
+        & $files[$fileName] | Export-Csv -Path $filePath -NoTypeInformation -Force -Delimiter ';'
+    }
+
+    Write-Log -Message "System information outputted to files: system_info.csv, cpu_info.csv, ram_info.csv, disk_info.csv"
+    Write-Host "System information outputted to files successfully" -ForegroundColor Green
+}
+
+function SystemInfo {
+    while ($true) {
+        switch (SystemMenu) {
+        "1" {
+            Clear-Host
+            GetOS
+            continue
+            }
+        
+        "2" {
+            Clear-Host
+            GetCPU
+            continue
+        }
+        "3" {
+            Clear-Host
+            GetRAM
+            continue
+        }
+        "4" {
+            Clear-Host
+            GetDisk
+            continue
+        }
+        "5" {
+            Clear-Host
+            OutputSysInfo
+            continue
+        }
+        "q" {
+            Clear-Host
+            Write-Host "Returning to main menu"
+            return
+        }
+       }
+
+    }
+}
 
 
 # Main loop of the starting menu
@@ -456,6 +601,11 @@ while ($true) {
                 Clear-Host
                 Write-Host "Opening fix menu"
                 ApplyFixes
+        }
+        "3" {
+                Clear-Host
+                Write-Host "Opening system info menu"
+                SystemInfo
         }
         "q" {
                 Clear-Host
