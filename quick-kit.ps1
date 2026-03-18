@@ -82,7 +82,7 @@ function Write-Log {
     PROCESS {
         try {
             # Skip verbose messages unless enabled
-            if ($Level -eq "VERBOSE" -and -not $Global:VerboseEnabled) {
+            if ($Type -eq "VERBOSE" -and -not $Global:VerboseEnabled) {
             return
             }
             Add-Content -Path $LogFile -Value "$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss') [$Type] $Message"
