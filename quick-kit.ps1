@@ -178,7 +178,7 @@ function FixMenu {
 FIX LIST:
 Choose an option:
 [1] Old right-click context menu
-[2] Coming Soon
+[2] Show file extensions
 [Q] Quit to main menu
 
 "
@@ -393,7 +393,8 @@ function RegistryHandler {
 
     if ($Global:SilentEnabled -or (ConfirmPrompt) -eq 'y') {
 
-        Write-Host $useNamedValue # REMOVE
+        Clear-Host
+
         if ($useNamedValue) {
             # Check current DWORD value
             $currentVal = (Get-ItemProperty -Path "Registry::$RegPath" -Name $ValueName -ErrorAction SilentlyContinue).$ValueName
@@ -410,7 +411,6 @@ function RegistryHandler {
                 Write-Host "Reverting $FixName fix"
 
                 
-                Write-Host $useNamedValue
                 if ($useNamedValue) {
                     # Toggle back to revert value
 
@@ -432,7 +432,7 @@ function RegistryHandler {
                 if ($LASTEXITCODE -eq 0) {
                     Stop-Process -ProcessName explorer -Force
                     Write-Log -Message "SUCCESS, reverted $FixName fix."
-                    Write-Host "Fix reverted successfully, returning to menu"
+                    Write-Host -ForegroundColor Green "Fix reverted successfully, returning to menu"
                 } else {
                     Write-Log -Type ERROR -Message "Failed to revert $FixName fix."
                     Write-Host -ForegroundColor Red "Fix failed, check logs"
@@ -461,15 +461,13 @@ function RegistryHandler {
 
             if ($LASTEXITCODE -eq 0) {
                 Stop-Process -ProcessName explorer -Force
-                Write-Log -Message "SUCCESS, reverted $FixName fix."
-                Write-Host "Fix reverted successfully, returning to menu"
+                Write-Log -Message "SUCCESS, applied $FixName fix."
+                Write-Host -ForegroundColor Green "Fix applied successfully, returning to menu"
             } else {
-                Write-Log -Type ERROR -Message "Failed to revert $FixName fix."
+                Write-Log -Type ERROR -Message "Failed to apply $FixName fix."
                 Write-Host -ForegroundColor Red "Fix failed, check logs"
             }
 
-            Write-Log -Message "SUCCESS, applied $FixName fix."
-            Write-Host -ForegroundColor Green "Fix applied successfully, returning to menu"
             Start-Sleep 2
         }
 
@@ -487,7 +485,7 @@ function ApplyFixes {
         
         "2" {
             Clear-Host
-            Write-Host "Coming soon" -ForegroundColor Yellow
+            RegistryHandler -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions"
             continue
         }
         "q" {
