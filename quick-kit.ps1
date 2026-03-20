@@ -296,7 +296,7 @@ function InstallHandler {
 
     if ($LASTEXITCODE -eq 0) {
         Write-Log -Message "Successfully installed $ReadableAppID"
-        Write-Host "Successfully installed $ReadableAppID, returning to essential app install menu" -ForegroundColor Green
+        Write-Host "Successfully installed $ReadableAppID" -ForegroundColor Green
     } elseif ($friendly_message) {
         if (-not $Global:VerboseEnabled) {
             Write-Log -Type $logType -Message "Failed to install $ReadableAppID. $friendly_message"
@@ -597,6 +597,47 @@ function OutputSysInfo {
     Write-Host "System information outputted to files successfully" -ForegroundColor Green
 }
 
+function BulkInstallBrowsers {
+    Clear-Host
+
+    Write-Log -Message "Bulk browser installation starting, requesting confirmation"
+
+    if ((ConfirmPrompt) -eq "y") {
+        Write-Log -Message "Bulk browser installation started, confirmed by user"
+        Write-Host "Bulk browser installation starting"
+        InstallHandler -AppID "Google.Chrome" -ReadableAppID "Google Chrome"
+        $GoogleChromeInstalled = $LASTEXITCODE -eq 0
+
+        InstallHandler -AppID "Mozilla.Firefox" -ReadableAppID "Mozilla Firefox"
+        $MozillaFirefoxInstalled = $LASTEXITCODE -eq 0
+
+        InstallHandler -AppID "Brave.Brave" -ReadableAppID "Brave Browser"
+        $BraveInstalled = $LASTEXITCODE -eq 0
+
+        $downloadedBrowsers = @(
+            if ($GoogleChromeInstalled)  { "Google Chrome" }
+            if ($MozillaFirefoxInstalled) { "Mozilla Firefox" }
+            if ($BraveInstalled)          { "Brave Browser" }
+        ) -join ", "
+
+        if (-not $GoogleChromeInstalled -and -not $MozillaFirefoxInstalled -and -not $BraveInstalled) {
+            Write-Log -Type ERROR -Message "Bulk browser installation failed, no browsers were downloaded"
+            Write-Host -ForegroundColor Red "Bulk browser installation failed, no browsers were downloaded, returning to menu"
+            Start-Sleep 1
+        } elseif ($GoogleChromeInstalled -or $MozillaFirefoxInstalled -or $BraveInstalled) {
+            Write-Log -Message "Bulk browser installation was partly successful, downloaded $downloadedBrowsers"
+            Write-Host "Bulk browser installation was partly successful, downloaded $downloadedBrowsers"
+            Start-Sleep 1
+        } else {
+            Write-Log -Message "Bulk browser installation was successful, downloaded $downloadedBrowsers"
+            Write-Host -ForegroundColor Green "Bulk browser installation was successful, downloaded $downloadedBrowsers"
+        }
+    } else {
+        Write-Log -Message "Bulk browser installation cancelled by user"
+        Write-Host "Cancelled. Returning to menu"
+    }
+}
+
 function SystemInfo {
     while ($true) {
         switch (SystemMenu) {
@@ -638,7 +679,7 @@ function SystemInfo {
 
 function BulkInstall {
     while ($true) {
-        switch (SystemMenu) {
+        switch (BulkInstallMenu) {
         "1" {
             Clear-Host
             BulkInstallBrowsers
@@ -682,9 +723,9 @@ while ($true) {
                 ApplyFixes
         }
         "3" {
-            Clear-Host
-            Write-Host "Opening bulk install menu"
-            SystemInfo
+                Clear-Host
+                Write-Host "Opening bulk install menu"
+                BulkInstall
         }
         "4" {
                 Clear-Host
