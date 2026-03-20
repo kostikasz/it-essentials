@@ -358,73 +358,122 @@ function InstallingEssentials {
 function RegistryHandler {
     param (
         [Parameter(Mandatory=$true)]
-        [String]
-        $RegPath,
+        [String]$RegPath,
 
         [Parameter(Mandatory=$true)]
-        [string]
-        $FixName
+        [string]$FixName,
+
+
+        # For fixes when reverting or applying uses same or different commands than usual
+        [Parameter(Mandatory=$false)]
+        [string]$ApplyCommand = "add",     
+
+        [Parameter(Mandatory=$false)]
+        [string]$RevertCommand = "delete",     
+
+
+
+        # New optional params for named values
+        [Parameter(Mandatory=$false)]
+        [string]$ValueName = "",          # Empty = default (/ve) mode
+
+        [Parameter(Mandatory=$false)]
+        [string]$ValueType = "REG_DWORD",
+
+        [Parameter(Mandatory=$false)]
+        [string]$ApplyData = "",          # Value when applying fix
+
+        [Parameter(Mandatory=$false)]
+        [string]$RevertData = ""          # Value when reverting fix
     )
     
+    $useNamedValue = $ValueName -ne ""
+
     Clear-Host
- 
+
     if ($Global:SilentEnabled -or (ConfirmPrompt) -eq 'y') {
-        # Checking if registery already exists
-        Write-Log -Type VERBOSE -Message "Checking if registry already exists by running query at $RegPath"
-        $RegStatus=reg.exe query $RegPath
-        if ($RegStatus) {
-            if (-not $Global:VerboseEnabled) {
-                Write-Log -Type ERROR -Message "The fix is already applied."
-            }
-            Write-Log -Type VERBOSE -Message "The registry already exists. Query outputed'$RegStatus'"
+
+        Write-Host $useNamedValue # REMOVE
+        if ($useNamedValue) {
+            # Check current DWORD value
+            $currentVal = (Get-ItemProperty -Path "Registry::$RegPath" -Name $ValueName -ErrorAction SilentlyContinue).$ValueName
+            $alreadyApplied = $null -ne $currentVal -and "$currentVal" -eq $ApplyData
+        } else {
+            $alreadyApplied = Test-Path -Path "Registry::$RegPath"
+        }
+
+        if ($alreadyApplied) {
             Write-Warning "The fix is already applied."
 
-            if ($Global:SilentEnabled -or (RevertChanges) -eq 'y') {    # Calling menu for reverting changes
-                Write-Log -Message "Reverting $FixName fix."
+            if ($Global:SilentEnabled -or (RevertChanges) -eq 'y') {
+                Write-Log -Message "Reverting $FixName fix at the request of user"
                 Write-Host "Reverting $FixName fix"
+
                 
-                Write-Log -Type VERBOSE -Message "Trying to delete registry at $RegPath"
-                if ($Global:SilentEnabled) {
-                    reg.exe delete $RegPath /f /ve | Out-Null
-                } else {
-                    reg.exe delete $RegPath /f /ve
-                }
-                Write-Log -Type VERBOSE -Message "Deleted registry at $RegPath"
+                Write-Host $useNamedValue
+                if ($useNamedValue) {
+                    # Toggle back to revert value
 
-                    Write-Log -Type VERBOSE -Message "Stopping Windows Explorer"
+                    if ($Global:SilentEnabled) {
+                        reg.exe $RevertCommand $RegPath /v $ValueName /t $ValueType /d $RevertData /f  | Out-Null
+                    } else {
+                        reg.exe $RevertCommand $RegPath /v $ValueName /t $ValueType /d $RevertData /f
+                    }
+                } else {
+
+                    if ($Global:SilentEnabled) {
+                        reg.exe $RevertCommand $RegPath /f | Out-Null
+                    } else {
+                        reg.exe $RevertCommand $RegPath /f
+                    }
+
+                }
+
+                if ($LASTEXITCODE -eq 0) {
                     Stop-Process -ProcessName explorer -Force
-                    Write-Log -Type VERBOSE -Message "Stopped Windows Explorer (auto-restart expected)"
-
-                Write-Log -Message "SUCCESS, reverted $FixName fix."
-                Write-Host -ForegroundColor Green "Fix deleted successfully, returning to menu"
-            }
-        } else {
-                #Make it check if the registery edit already exists
-                Write-Log -Message "Applying $FixName fix."
-                Write-Host "Applying $FixName fix"
-
-                Write-Log -Type VERBOSE -Message "Trying to add registry at $RegPath"
-                if ($Global:SilentEnabled) {
-                    reg.exe add $RegPath /f /ve | Out-Null
+                    Write-Log -Message "SUCCESS, reverted $FixName fix."
+                    Write-Host "Fix reverted successfully, returning to menu"
                 } else {
-                    reg.exe add $RegPath /f /ve
+                    Write-Log -Type ERROR -Message "Failed to revert $FixName fix."
+                    Write-Host -ForegroundColor Red "Fix failed, check logs"
                 }
-                Write-Log -Type VERBOSE -Message "Added registry at $RegPath"
+            }
+            
+
+        } else {
+            Write-Log -Message "Applying $FixName fix."
+            Write-Host "Applying $FixName fix"
 
 
-                Write-Log -Type VERBOSE -Message "Stopping Windows Explorer"
+            if ($useNamedValue) {
+                if ($Global:SilentEnabled) {
+                    reg.exe $ApplyCommand $RegPath /v $ValueName /t $ValueType /d $ApplyData /f | Out-Null
+                } else {
+                    reg.exe $ApplyCommand $RegPath /v $ValueName /t $ValueType /d $ApplyData /f
+                }
+            } else {
+                if ($Global:SilentEnabled) {
+                    reg.exe $ApplyCommand $RegPath /f /ve | Out-Null
+                } else {
+                    reg.exe $ApplyCommand $RegPath /f /ve
+                }
+            }
+
+            if ($LASTEXITCODE -eq 0) {
                 Stop-Process -ProcessName explorer -Force
-                Write-Log -Type VERBOSE -Message "Stopped Windows Explorer (auto-restart expected)"
+                Write-Log -Message "SUCCESS, reverted $FixName fix."
+                Write-Host "Fix reverted successfully, returning to menu"
+            } else {
+                Write-Log -Type ERROR -Message "Failed to revert $FixName fix."
+                Write-Host -ForegroundColor Red "Fix failed, check logs"
+            }
 
-                Write-Log -Message "SUCCESS, applied $FixName fix."
-                Write-Host -ForegroundColor Green "Fix applied Successfully, returning to menu"
+            Write-Log -Message "SUCCESS, applied $FixName fix."
+            Write-Host -ForegroundColor Green "Fix applied successfully, returning to menu"
+            Start-Sleep 2
         }
-        Start-Sleep 2
-    } else {
-        return
-    }
- 
 
+    }
 }
 
 function ApplyFixes {
