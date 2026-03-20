@@ -136,11 +136,12 @@ function StartingMenu {
 Choose an option:
 [1] Install essential apps
 [2] Install fixes
-[3] System information
+[3] Bulk install apps/fixes
+[4] System information
 [Q] Quit
 
 "
-    return MenuHandler -ValidOptions '1','2','3','q' # Function returns the choice
+    return MenuHandler -ValidOptions '1','2','3','4','q' # Function returns the choice
 }
 
 function InstallMenu {
@@ -156,6 +157,20 @@ Choose an option:
 
 "
     return MenuHandler -ValidOptions '1','2','3','4','q' # Function returns the choice
+}
+
+function BulkInstallMenu {
+    Write-Host "kostikasz IT support quick kit
+
+BULK INSTALLATION menu
+Choose an option:
+[1] Install browsers
+[2] Apply all fixes
+[3] Install full essentials pack
+[Q] Quit to main menu
+
+"
+    return MenuHandler -ValidOptions '1','2','3','q' # Function returns the choice
 }
 
 function InstallMenuBrowsers {
@@ -621,6 +636,34 @@ function SystemInfo {
     }
 }
 
+function BulkInstall {
+    while ($true) {
+        switch (SystemMenu) {
+        "1" {
+            Clear-Host
+            BulkInstallBrowsers
+            continue
+            }
+        
+        "2" {
+            Clear-Host
+            BulkApplyFixes
+            continue
+        }
+        "3" {
+            Clear-Host
+            BulkInstallEssentials
+            continue
+        }
+        "q" {
+            Clear-Host
+            Write-Host "Returning to main menu"
+            return
+        }
+       }
+
+    }
+}
 
 # Main loop of the starting menu
 Clear-Host
@@ -639,6 +682,11 @@ while ($true) {
                 ApplyFixes
         }
         "3" {
+            Clear-Host
+            Write-Host "Opening bulk install menu"
+            SystemInfo
+        }
+        "4" {
                 Clear-Host
                 Write-Host "Opening system info menu"
                 SystemInfo
