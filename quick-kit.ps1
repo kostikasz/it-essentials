@@ -399,14 +399,25 @@ function RegistryHandler {
         [string]$ApplyData = "",          # Value when applying fix
 
         [Parameter(Mandatory=$false)]
-        [string]$RevertData = ""          # Value when reverting fix
+        [string]$RevertData = "",          # Value when reverting fix
+
+        [Parameter(Mandatory=$false)]
+        [switch]$Silent = $Global:SilentEnabled,
+
+        [Parameter(Mandatory=$false)]
+        [switch]$Bulk = $false,
+
+        [Parameter(Mandatory=$false)]
+        [switch]$ExplorerRestartBulk = $false
     )
     
+
+    if($Bulk) {$Silent=$true}
     $useNamedValue = $ValueName -ne ""
 
     Clear-Host
 
-    if ($Global:SilentEnabled -or (ConfirmPrompt) -eq 'y') {
+    if ($Silent -or (ConfirmPrompt) -eq 'y') {
 
         Clear-Host
 
@@ -421,7 +432,7 @@ function RegistryHandler {
         if ($alreadyApplied) {
             Write-Warning "The fix is already applied."
 
-            if ($Global:SilentEnabled -or (RevertChanges) -eq 'y') {
+            if ($Silent -or (RevertChanges) -eq 'y') {
                 Write-Log -Message "Reverting $FixName fix at the request of user"
                 Write-Host "Reverting $FixName fix"
 
@@ -429,14 +440,14 @@ function RegistryHandler {
                 if ($useNamedValue) {
                     # Toggle back to revert value
 
-                    if ($Global:SilentEnabled) {
+                    if ($Silent) {
                         reg.exe $RevertCommand $RegPath /v $ValueName /t $ValueType /d $RevertData /f  | Out-Null
                     } else {
                         reg.exe $RevertCommand $RegPath /v $ValueName /t $ValueType /d $RevertData /f
                     }
                 } else {
 
-                    if ($Global:SilentEnabled) {
+                    if ($Silent) {
                         reg.exe $RevertCommand $RegPath /f | Out-Null
                     } else {
                         reg.exe $RevertCommand $RegPath /f
@@ -445,6 +456,13 @@ function RegistryHandler {
                 }
 
                 if ($LASTEXITCODE -eq 0) {
+                    if ($Bulk) {
+                        if ($ExplorerRestartBulk) {
+                            Stop-Process -ProcessName explorer -Force
+                        }
+                    } else {
+                        Stop-Process -ProcessName explorer -Force
+                    }
                     Stop-Process -ProcessName explorer -Force
                     Write-Log -Message "SUCCESS, reverted $FixName fix."
                     Write-Host -ForegroundColor Green "Fix reverted successfully, returning to menu"
@@ -461,13 +479,13 @@ function RegistryHandler {
 
 
             if ($useNamedValue) {
-                if ($Global:SilentEnabled) {
+                if ($Silent) {
                     reg.exe $ApplyCommand $RegPath /v $ValueName /t $ValueType /d $ApplyData /f | Out-Null
                 } else {
                     reg.exe $ApplyCommand $RegPath /v $ValueName /t $ValueType /d $ApplyData /f
                 }
             } else {
-                if ($Global:SilentEnabled) {
+                if ($Silent) {
                     reg.exe $ApplyCommand $RegPath /f /ve | Out-Null
                 } else {
                     reg.exe $ApplyCommand $RegPath /f /ve
@@ -475,7 +493,13 @@ function RegistryHandler {
             }
 
             if ($LASTEXITCODE -eq 0) {
-                Stop-Process -ProcessName explorer -Force
+                if ($Bulk) {
+                    if ($ExplorerRestartBulk) {
+                        Stop-Process -ProcessName explorer -Force
+                    }
+                } else {
+                    Stop-Process -ProcessName explorer -Force
+                }
                 Write-Log -Message "SUCCESS, applied $FixName fix."
                 Write-Host -ForegroundColor Green "Fix applied successfully, returning to menu"
             } else {
@@ -634,6 +658,44 @@ function BulkInstallBrowsers {
         }
     } else {
         Write-Log -Message "Bulk browser installation cancelled by user"
+        Write-Host "Cancelled. Returning to menu"
+    }
+}
+
+function BulkApplyFixes {
+
+    Write-Log -Message "Bulk fix application starting, requesting confirmation"
+
+    if ((ConfirmPrompt) -eq "y") {
+
+        Write-Log -Message "Bulk fix application started, confirmed by user"
+        Write-Host "Bulk fix application starting"
+
+        RegistryHandler -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu" -Bulk
+        $ContextMenuApplied = $LASTEXITCODE -eq 0
+        RegistryHandler -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions" -Bulk -ExplorerRestartBulk
+        $FileExtensionsApplied = $LASTEXITCODE -eq 0
+
+        $appliedFixes = @(
+            if ($ContextMenuApplied)  { "right-click context menu" }
+            if ($FileExtensionsApplied) { "file extensions" }
+        ) -join ", "
+
+        if (-not $ContextMenuApplied -and -not $FileExtensionsApplied) {
+            Write-Log -Type ERROR -Message "Bulk fix application failed, no fixes were applied"
+            Write-Host -ForegroundColor Red "Bulk fix application failed, no fixes were applied, returning to menu"
+            Start-Sleep 1
+        } elseif ($GoogleChromeInstalled -or $MozillaFirefoxInstalled -or $BraveInstalled) {
+            Write-Log -Message "Bulk fix application was partly successful, applied $appliedFixes"
+            Write-Host "Bulk fix application was partly successful, applied $appliedFixes"
+            Start-Sleep 1
+        } else {
+            Write-Log -Message "Bulk fix application was successful, applied $appliedFixes"
+            Write-Host -ForegroundColor Green "Bulk fix application was successful, applied $appliedFixes"
+        }
+
+    } else {
+        Write-Log -Message "Bulk fix application cancelled by user"
         Write-Host "Cancelled. Returning to menu"
     }
 }
