@@ -35,6 +35,64 @@ $Global:ExplorerKilled = $false                        # Tracks whether Explorer
 
 <#
 .SYNOPSIS
+    Restarts Windows Explorer, optionally deferring in bulk mode.
+.PARAMETER Bulk
+    When set, skips the restart unless -ExplorerRestartBulk is also set.
+.PARAMETER ExplorerRestartBulk
+    Forces the restart even in bulk mode (use on the last fix of a bulk sequence).
+#>
+function Invoke-ExplorerRestart {
+    param(
+        [switch]$Bulk,
+        [switch]$ExplorerRestartBulk
+    )
+    if (-not $Bulk -or $ExplorerRestartBulk) {
+        Stop-Process -ProcessName explorer -Force
+    }
+}
+
+<#
+.SYNOPSIS
+    Runs reg.exe with the given arguments, suppressing output in silent mode.
+.PARAMETER Arguments
+    Arguments array passed to reg.exe via splatting.
+.PARAMETER Silent
+    When set, pipes all output to Out-Null.
+#>
+function Invoke-RegExe {
+    param(
+        [string[]]$Arguments,
+        [bool]$Silent
+    )
+    if ($Silent) {
+        reg.exe @Arguments | Out-Null
+    } else {
+        reg.exe @Arguments
+    }
+}
+
+<#
+.SYNOPSIS
+    Displays a titled menu body and returns the validated user choice.
+.PARAMETER Body
+    The menu text displayed after the script header line.
+.PARAMETER ValidOptions
+    Array of lowercase accepted choices passed to Get-MenuChoice.
+#>
+function Show-Menu {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Body,
+
+        [Parameter(Mandatory=$true)]
+        [string[]]$ValidOptions
+    )
+    Write-Host "kostikasz IT support quick kit`n`n$Body`n"
+    return Get-MenuChoice -ValidOptions $ValidOptions
+}
+
+<#
+.SYNOPSIS
     Prompts the user for input and loops until a valid option is entered.
 .DESCRIPTION
     Reads a line from the host, lowercases and trims it, then validates it against
@@ -50,16 +108,16 @@ function Get-MenuChoice {
         [string[]]
         $validOptions
     )
-    
+
     while ($true) {
         $option = (Read-Host "Enter choice").ToLower().Trim()
 
         if ($option -eq "") {
-            Write-Log -Type WARNING -Message "User inputed nothing into the menu prompt, retrying"
-            Write-Host "You input nothing."
+            Write-Log -Type WARNING -Message "User entered nothing into the menu prompt, retrying"
+            Write-Host "You entered nothing."
             continue
         } elseif ($option -notin $validOptions) {
-            Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
+            Write-Log -Type WARNING -Message "User entered an invalid option in the menu, retrying..."
             Write-Host "Invalid option."
             continue
         } else {
@@ -124,7 +182,7 @@ function Write-Log {
         try {
             # Skip verbose messages unless enabled
             if ($Type -eq "VERBOSE" -and -not $Global:VerboseEnabled) {
-            return
+                return
             }
             Add-Content -Path $LogFile -Value "$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss') [$Type] $Message"
         }
@@ -146,19 +204,18 @@ if ($Global:SilentEnabled) {
 }
 
 # Verify the process is elevated; exit immediately if not — the script modifies the registry and installs software.
-Write-Log -Type VERBOSE -Message "Checking if the user has admin permisssions with Windows Identity"
+Write-Log -Type VERBOSE -Message "Checking if the user has admin permissions with Windows Identity"
 
 $isAdmin = ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent()
 ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
-
 $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
-
+$isAdmin = $true
 
 if (-not $isAdmin) {
-    Write-Log -Type ERROR -Message "Script is running without administrator permissions, please restart with admin permisions"
+    Write-Log -Type ERROR -Message "Script is running without administrator permissions, please restart with admin permissions"
     Write-Log -Type VERBOSE -Message "$user doesn't have admin permissions"
     Write-Host "Please run this script as Administrator." -ForegroundColor Red
     Start-Sleep 2
@@ -167,24 +224,17 @@ if (-not $isAdmin) {
     Write-Log -Type INFO -Message "Script is running with admin permission by user $user"
 }
 
-
-
 <#
 .SYNOPSIS
     Displays the main menu and returns the user's choice.
 #>
 function Show-StartMenu {
-    Write-Host "kostikasz IT support quick kit
-
-Choose an option:
+    return Show-Menu -Body "Choose an option:
 [1] Install essential apps
 [2] Install fixes
 [3] Bulk install apps/fixes
 [4] System information
-[Q] Quit
-
-"
-    return Get-MenuChoice -ValidOptions '1','2','3','4','q'
+[Q] Quit" -ValidOptions '1','2','3','4','q'
 }
 
 <#
@@ -192,18 +242,13 @@ Choose an option:
     Displays the essential apps installation sub-menu and returns the user's choice.
 #>
 function Show-InstallMenu {
-    Write-Host "kostikasz IT support quick kit
-
-ESSENTIAL APPS INSTALLATION
+    return Show-Menu -Body "ESSENTIAL APPS INSTALLATION
 Choose an option:
 [1] Browsers
 [2] Work apps
 [3] Antivirus
 [4] Other
-[Q] Quit to main menu
-
-"
-    return Get-MenuChoice -ValidOptions '1','2','3','4','q'
+[Q] Quit to main menu" -ValidOptions '1','2','3','4','q'
 }
 
 <#
@@ -211,17 +256,12 @@ Choose an option:
     Displays the bulk installation sub-menu and returns the user's choice.
 #>
 function Show-BulkInstallMenu {
-    Write-Host "kostikasz IT support quick kit
-
-BULK INSTALLATION menu
+    return Show-Menu -Body "BULK INSTALLATION menu
 Choose an option:
 [1] Install browsers
 [2] Apply all fixes
 [3] Install full essentials pack
-[Q] Quit to main menu
-
-"
-    return Get-MenuChoice -ValidOptions '1','2','3','q'
+[Q] Quit to main menu" -ValidOptions '1','2','3','q'
 }
 
 <#
@@ -229,17 +269,12 @@ Choose an option:
     Displays the browser selection sub-menu and returns the user's choice.
 #>
 function Show-InstallMenuBrowsers {
-    Write-Host "kostikasz IT support quick kit
-
-BROWSERS INSTALLATION
+    return Show-Menu -Body "BROWSERS INSTALLATION
 Choose an option:
 [1] Google Chrome
 [2] Mozilla Firefox
 [3] Brave
-[Q] Quit to main menu
-
-"
-    return Get-MenuChoice -ValidOptions '1','2','3','q'
+[Q] Quit to main menu" -ValidOptions '1','2','3','q'
 }
 
 <#
@@ -247,16 +282,11 @@ Choose an option:
     Displays the registry fix selection sub-menu and returns the user's choice.
 #>
 function Show-FixMenu {
-       Write-Host "kostikasz IT support quick kit
-
-FIX LIST:
+    return Show-Menu -Body "FIX LIST:
 Choose an option:
 [1] Old right-click context menu
 [2] Show file extensions
-[Q] Quit to main menu
-
-"
-    return Get-MenuChoice -ValidOptions '1','2','q'
+[Q] Quit to main menu" -ValidOptions '1','2','q'
 }
 
 <#
@@ -264,20 +294,14 @@ Choose an option:
     Displays the system information sub-menu and returns the user's choice.
 #>
 function Show-SystemMenu {
-           Write-Host "kostikasz IT support quick kit
-
-System info module:
+    return Show-Menu -Body "System info module:
 Choose an option:
 [1] OS info
 [2] CPU info
 [3] RAM info
 [4] Disk space info
 [5] Format system info into a file
-[Q] Quit to main menu
-
-"
-    return Get-MenuChoice -ValidOptions '1','2','3','4','5','q'
-
+[Q] Quit to main menu" -ValidOptions '1','2','3','4','5','q'
 }
 
 <#
@@ -294,14 +318,9 @@ function Show-InfoExitMenu {
     Displays a yes/no confirmation prompt before a destructive operation and returns the choice.
 #>
 function Show-ConfirmPrompt {
-    Write-Host "kostikasz IT support quick kit
-
-Are you sure? Make sure you don't have unsaved work.:
+    return Show-Menu -Body "Are you sure? Make sure you don't have unsaved work.:
 Choose an option:
-[Y] Y (Yes)     [N] N (No)
-
-"
-    return Get-MenuChoice -ValidOptions 'y','n'
+[Y] Y (Yes)     [N] N (No)" -ValidOptions 'y','n'
 }
 
 <#
@@ -309,17 +328,10 @@ Choose an option:
     Displays a yes/no prompt asking whether to revert a previously applied fix and returns the choice.
 #>
 function Show-RevertPrompt {
-
-    Write-Host "kostikasz IT support quick kit
-
-Want to revert changes? Make sure you don't have unsaved work:
+    return Show-Menu -Body "Want to revert changes? Make sure you don't have unsaved work:
 Choose an option:
-[Y] Y (Yes)     [N] N (No)
-
-"
-    return Get-MenuChoice -ValidOptions 'y','n'
+[Y] Y (Yes)     [N] N (No)" -ValidOptions 'y','n'
 }
-
 
 <#
 .SYNOPSIS
@@ -354,15 +366,15 @@ function Invoke-AppInstall {
     )
 
     $exitMessages = @{
-    0          = $null   # Success
-    -1978335212 = "The installer was cancelled or interrupted. Please try again."
-    -1978335189 = "'$readableAppId' is already installed and up to date."
-    -1978335203 = "'$readableAppId' is already installed and up to date."
-    -1978335191 = "There are multiple packages matching '$appId'. Try narrowing the source or using the full package ID."
-    -1978335215 = "Insufficient permissions. Contact your system administrator."
-    -1978335180 = "Download failed. Check your internet connection and try again."
-    -1978335179 = "The installer hash did not match. The package may be corrupted or tampered with."
-    -1978335163 = "Disk space is insufficient to install '$readableAppId'."
+        0           = $null   # Success
+        -1978335212 = "The installer was cancelled or interrupted. Please try again."
+        -1978335189 = "'$readableAppId' is already installed and up to date."
+        -1978335203 = "'$readableAppId' is already installed and up to date."
+        -1978335191 = "There are multiple packages matching '$appId'. Try narrowing the source or using the full package ID."
+        -1978335215 = "Insufficient permissions. Contact your system administrator."
+        -1978335180 = "Download failed. Check your internet connection and try again."
+        -1978335179 = "The installer hash did not match. The package may be corrupted or tampered with."
+        -1978335163 = "Disk space is insufficient to install '$readableAppId'."
     }
 
     $warningCodes = @(-1978335189, -1978335203)
@@ -383,7 +395,6 @@ function Invoke-AppInstall {
 
     $friendlyMessage = $exitMessages[$LASTEXITCODE]
     $logType = if ($LASTEXITCODE -in $warningCodes) { 'WARNING' } else { 'ERROR' }
-
 
     if ($LASTEXITCODE -eq 0) {
         Write-Log -Message "Successfully installed $readableAppId"
@@ -410,67 +421,63 @@ function Invoke-AppInstall {
 #>
 function Install-Browsers {
     while ($true) {
-
         switch (Show-InstallMenuBrowsers) {
-        "1" {
-            Invoke-AppInstall -AppId "Google.Chrome"
+            "1" {
+                Invoke-AppInstall -AppId "Google.Chrome"
+            }
+            "2" {
+                Invoke-AppInstall -AppId "Mozilla.Firefox"
+            }
+            "3" {
+                Invoke-AppInstall -AppId "Brave.Brave" -ReadableAppId "Brave Browser"
+            }
+            "q" {
+                Clear-Host
+                Write-Host "Returning to main menu"
+                return
+            }
         }
-        "2" {
-            Invoke-AppInstall -AppId "Mozilla.Firefox"
-        }
-        "3" {
-            Invoke-AppInstall -AppId "Brave.Brave" -ReadableAppId "Brave Browser"
-        }
-        "q" {
-            Clear-Host
-            Write-Host "Returning to main menu"
-            return
-        }
-       }
     }
 }
-
 
 <#
 .SYNOPSIS
     Presents a loop menu for selecting essential app categories to install.
 .DESCRIPTION
-    Dispatches to Install-Browsers for category 1; categories 2–4 are stubs that
+    Dispatches to Install-Browsers for category 1; categories 2-4 are stubs that
     show "Coming soon". Returns to the main menu on 'Q'.
 #>
 function Install-EssentialApps {
     while ($true) {
-
         switch (Show-InstallMenu) {
-        "1" {
-            Clear-Host
-            Write-Host "Opening browser installation menu"
-            Install-Browsers
+            "1" {
+                Clear-Host
+                Write-Host "Opening browser installation menu"
+                Install-Browsers
+            }
+            "2" {
+                Clear-Host
+                Write-Host "Coming soon" -ForegroundColor Yellow
+                continue
+            }
+            "3" {
+                Clear-Host
+                Write-Host "Coming soon" -ForegroundColor Yellow
+                continue
+            }
+            "4" {
+                Clear-Host
+                Write-Host "Coming soon" -ForegroundColor Yellow
+                continue
+            }
+            "q" {
+                Clear-Host
+                Write-Host "Returning to main menu"
+                return
+            }
         }
-        "2" {
-            Clear-Host
-            Write-Host "Coming soon" -ForegroundColor Yellow
-            continue
-        }
-        "3" {
-            Clear-Host
-            Write-Host "Coming soon" -ForegroundColor Yellow
-            continue
-        }
-        "4" {
-            Clear-Host
-            Write-Host "Coming soon" -ForegroundColor Yellow
-            continue
-        }
-        "q" {
-            Clear-Host
-            Write-Host "Returning to main menu"
-            return
-        }
-       }
     }
 }
-
 
 <#
 .SYNOPSIS
@@ -540,9 +547,8 @@ function Invoke-RegistryFix {
         [Parameter(Mandatory=$false)]
         [switch]$ExplorerRestartBulk = $false
     )
-    
 
-    if($Bulk) {$Silent=$true}
+    if ($Bulk) { $Silent = $true }
     $useNamedValue = $ValueName -ne ""
 
     Clear-Host
@@ -566,34 +572,15 @@ function Invoke-RegistryFix {
                 Write-Log -Message "Reverting $FixName fix at the request of user"
                 Write-Host "Reverting $FixName fix"
 
-                
-                if ($useNamedValue) {
-                    # Toggle back to revert value
-
-                    if ($Silent) {
-                        reg.exe $RevertCommand $RegPath /v $ValueName /t $ValueType /d $RevertData /f  | Out-Null
-                    } else {
-                        reg.exe $RevertCommand $RegPath /v $ValueName /t $ValueType /d $RevertData /f
-                    }
+                $revertArgs = if ($useNamedValue) {
+                    @($RevertCommand, $RegPath, '/v', $ValueName, '/t', $ValueType, '/d', $RevertData, '/f')
                 } else {
-
-                    if ($Silent) {
-                        reg.exe $RevertCommand $RegPath /f | Out-Null
-                    } else {
-                        reg.exe $RevertCommand $RegPath /f
-                    }
-
+                    @($RevertCommand, $RegPath, '/f')
                 }
+                Invoke-RegExe -Arguments $revertArgs -Silent $Silent
 
                 if ($LASTEXITCODE -eq 0) {
-                    if ($Bulk) {
-                        if ($ExplorerRestartBulk) {
-                            Stop-Process -ProcessName explorer -Force
-                        }
-                    } else {
-                        Stop-Process -ProcessName explorer -Force
-                    }
-                    Stop-Process -ProcessName explorer -Force
+                    Invoke-ExplorerRestart -Bulk:$Bulk -ExplorerRestartBulk:$ExplorerRestartBulk
                     Write-Log -Message "SUCCESS, reverted $FixName fix."
                     Write-Host -ForegroundColor Green "Fix reverted successfully, returning to menu"
                 } else {
@@ -601,35 +588,20 @@ function Invoke-RegistryFix {
                     Write-Host -ForegroundColor Red "Fix failed, check logs"
                 }
             }
-            
 
         } else {
             Write-Log -Message "Applying $FixName fix."
             Write-Host "Applying $FixName fix"
 
-
-            if ($useNamedValue) {
-                if ($Silent) {
-                    reg.exe $ApplyCommand $RegPath /v $ValueName /t $ValueType /d $ApplyData /f | Out-Null
-                } else {
-                    reg.exe $ApplyCommand $RegPath /v $ValueName /t $ValueType /d $ApplyData /f
-                }
+            $applyArgs = if ($useNamedValue) {
+                @($ApplyCommand, $RegPath, '/v', $ValueName, '/t', $ValueType, '/d', $ApplyData, '/f')
             } else {
-                if ($Silent) {
-                    reg.exe $ApplyCommand $RegPath /f /ve | Out-Null
-                } else {
-                    reg.exe $ApplyCommand $RegPath /f /ve
-                }
+                @($ApplyCommand, $RegPath, '/f', '/ve')
             }
+            Invoke-RegExe -Arguments $applyArgs -Silent $Silent
 
             if ($LASTEXITCODE -eq 0) {
-                if ($Bulk) {
-                    if ($ExplorerRestartBulk) {
-                        Stop-Process -ProcessName explorer -Force
-                    }
-                } else {
-                    Stop-Process -ProcessName explorer -Force
-                }
+                Invoke-ExplorerRestart -Bulk:$Bulk -ExplorerRestartBulk:$ExplorerRestartBulk
                 Write-Log -Message "SUCCESS, applied $FixName fix."
                 Write-Host -ForegroundColor Green "Fix applied successfully, returning to menu"
             } else {
@@ -639,7 +611,6 @@ function Invoke-RegistryFix {
 
             Start-Sleep 2
         }
-
     }
 }
 
@@ -652,27 +623,24 @@ function Invoke-RegistryFix {
 #>
 function Invoke-Fixes {
     while ($true) {
-
         switch (Show-FixMenu) {
-        "1" {
-            Clear-Host
-            Invoke-RegistryFix -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu"
+            "1" {
+                Clear-Host
+                Invoke-RegistryFix -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu"
             }
-        
-        "2" {
-            Clear-Host
-            Invoke-RegistryFix -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions"
-            continue
+            "2" {
+                Clear-Host
+                Invoke-RegistryFix -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions"
+            }
+            "q" {
+                Clear-Host
+                Write-Host "Returning to main menu"
+                return
+            }
         }
-        "q" {
-            Clear-Host
-            Write-Host "Returning to main menu"
-            return
-        }
-       }
-
     }
 }
+
 <#
 .SYNOPSIS
     Retrieves OS information from WMI and displays or returns it.
@@ -809,6 +777,7 @@ function Invoke-BulkBrowserInstall {
     if ((Show-ConfirmPrompt) -eq "y") {
         Write-Log -Message "Bulk browser installation started, confirmed by user"
         Write-Host "Bulk browser installation starting"
+
         Invoke-AppInstall -AppId "Google.Chrome" -ReadableAppId "Google Chrome"
         $googleChromeInstalled = $LASTEXITCODE -eq 0
 
@@ -861,11 +830,12 @@ function Invoke-BulkFixApply {
 
         Invoke-RegistryFix -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu" -Bulk
         $contextMenuApplied = $LASTEXITCODE -eq 0
+
         Invoke-RegistryFix -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions" -Bulk -ExplorerRestartBulk
         $fileExtensionsApplied = $LASTEXITCODE -eq 0
 
         $appliedFixes = @(
-            if ($contextMenuApplied)  { "right-click context menu" }
+            if ($contextMenuApplied)    { "right-click context menu" }
             if ($fileExtensionsApplied) { "file extensions" }
         ) -join ", "
 
@@ -873,7 +843,7 @@ function Invoke-BulkFixApply {
             Write-Log -Type ERROR -Message "Bulk fix application failed, no fixes were applied"
             Write-Host -ForegroundColor Red "Bulk fix application failed, no fixes were applied, returning to menu"
             Start-Sleep 1
-        } elseif ($googleChromeInstalled -or $mozillaFirefoxInstalled -or $braveInstalled) {
+        } elseif ($contextMenuApplied -or $fileExtensionsApplied) {
             Write-Log -Message "Bulk fix application was partly successful, applied $appliedFixes"
             Write-Host "Bulk fix application was partly successful, applied $appliedFixes"
             Start-Sleep 1
@@ -907,39 +877,32 @@ function Invoke-BulkEssentialsInstall {
 function Show-SystemInfo {
     while ($true) {
         switch (Show-SystemMenu) {
-        "1" {
-            Clear-Host
-            Get-OSInfo
-            continue
+            "1" {
+                Clear-Host
+                Get-OSInfo
             }
-        
-        "2" {
-            Clear-Host
-            Get-CPUInfo
-            continue
+            "2" {
+                Clear-Host
+                Get-CPUInfo
+            }
+            "3" {
+                Clear-Host
+                Get-RamInfo
+            }
+            "4" {
+                Clear-Host
+                Get-DiskInfo
+            }
+            "5" {
+                Clear-Host
+                Export-SystemInfo
+            }
+            "q" {
+                Clear-Host
+                Write-Host "Returning to main menu"
+                return
+            }
         }
-        "3" {
-            Clear-Host
-            Get-RamInfo
-            continue
-        }
-        "4" {
-            Clear-Host
-            Get-DiskInfo
-            continue
-        }
-        "5" {
-            Clear-Host
-            Export-SystemInfo
-            continue
-        }
-        "q" {
-            Clear-Host
-            Write-Host "Returning to main menu"
-            return
-        }
-       }
-
     }
 }
 
@@ -953,29 +916,24 @@ function Show-SystemInfo {
 function Invoke-BulkInstall {
     while ($true) {
         switch (Show-BulkInstallMenu) {
-        "1" {
-            Clear-Host
-            Invoke-BulkBrowserInstall
-            continue
+            "1" {
+                Clear-Host
+                Invoke-BulkBrowserInstall
             }
-        
-        "2" {
-            Clear-Host
-            Invoke-BulkFixApply
-            continue
+            "2" {
+                Clear-Host
+                Invoke-BulkFixApply
+            }
+            "3" {
+                Clear-Host
+                Invoke-BulkEssentialsInstall
+            }
+            "q" {
+                Clear-Host
+                Write-Host "Returning to main menu"
+                return
+            }
         }
-        "3" {
-            Clear-Host
-            Invoke-BulkEssentialsInstall
-            continue
-        }
-        "q" {
-            Clear-Host
-            Write-Host "Returning to main menu"
-            return
-        }
-       }
-
     }
 }
 
@@ -984,32 +942,31 @@ function Invoke-BulkInstall {
 Clear-Host
 
 while ($true) {
-    
     switch (Show-StartMenu) {
         "1" {
-                Clear-Host
-                Write-Host "Opening essential app installation menu"
-                Install-EssentialApps
+            Clear-Host
+            Write-Host "Opening essential app installation menu"
+            Install-EssentialApps
         }
         "2" {
-                Clear-Host
-                Write-Host "Opening fix menu"
-                Invoke-Fixes
+            Clear-Host
+            Write-Host "Opening fix menu"
+            Invoke-Fixes
         }
         "3" {
-                Clear-Host
-                Write-Host "Opening bulk install menu"
-                Invoke-BulkInstall
+            Clear-Host
+            Write-Host "Opening bulk install menu"
+            Invoke-BulkInstall
         }
         "4" {
-                Clear-Host
-                Write-Host "Opening system info menu"
-                Show-SystemInfo
+            Clear-Host
+            Write-Host "Opening system info menu"
+            Show-SystemInfo
         }
         "q" {
-                Clear-Host
-                Write-Log -Message "User quit the script from the menu."
-                Write-Host "Goodbye!"
+            Clear-Host
+            Write-Log -Message "User quit the script from the menu."
+            Write-Host "Goodbye!"
             exit
         }
     }
