@@ -1,6 +1,21 @@
-# https://github.com/kostikasz
-
-
+<#
+.SYNOPSIS
+    Menu-driven Windows IT support utility for app installation, registry fixes, and system info.
+.DESCRIPTION
+    Provides four modules: essential app installation via winget, Windows registry fixes (with
+    revert support), bulk operations, and system information gathering with optional CSV export.
+    Requires Administrator privileges. Logs all actions to a timestamped file under .\logs\.
+.PARAMETER EnableVerbose
+    Enables verbose-level log entries. Suppressed by default.
+.PARAMETER EnableSilent
+    Suppresses confirmation prompts; all destructive operations run without user interaction.
+.EXAMPLE
+    .\quick-kit.ps1
+.EXAMPLE
+    .\quick-kit.ps1 -EnableVerbose -EnableSilent
+.NOTES
+    https://github.com/kostikasz
+#>
 param (
     [Parameter(Mandatory=$false)]
     [Switch]
@@ -13,17 +28,27 @@ param (
 
 $ErrorActionPreference = 'Stop'
 
-# Global variables
-$Global:VerboseEnabled = $EnableVerbose.IsPresent
-$Global:SilentEnabled = $EnableSilent.IsPresent
-$Script:LogFile = Join-Path -Path '.\logs\' -ChildPath "$(Split-Path $PSCommandPath -Leaf) - $(Get-Date -f 'yyyy-MM-dd_HH-mm-ss').log"
-$Global:ExplorerKilled = $false
+$Global:VerboseEnabled = $EnableVerbose.IsPresent      # Mirrors -EnableVerbose switch; gates VERBOSE log entries
+$Global:SilentEnabled  = $EnableSilent.IsPresent       # Mirrors -EnableSilent switch; skips confirmation prompts
+$Script:LogFile        = Join-Path -Path '.\logs\' -ChildPath "$(Split-Path $PSCommandPath -Leaf) - $(Get-Date -f 'yyyy-MM-dd_HH-mm-ss').log"  # Session log file path, created lazily by Write-Log
+$Global:ExplorerKilled = $false                        # Tracks whether Explorer was restarted this session
 
+<#
+.SYNOPSIS
+    Prompts the user for input and loops until a valid option is entered.
+.DESCRIPTION
+    Reads a line from the host, lowercases and trims it, then validates it against
+    the provided list. Logs a WARNING on empty or invalid input and retries.
+.PARAMETER validOptions
+    Array of accepted strings. All values must be lowercase; input is lowercased before comparison.
+.OUTPUTS
+    System.String — the validated, lowercase choice entered by the user.
+#>
 function Get-MenuChoice {
     param(
         [Parameter(Mandatory=$true)]
         [string[]]
-        $validOptions # Should all be passed in lower-case
+        $validOptions
     )
     
     while ($true) {
@@ -43,6 +68,22 @@ function Get-MenuChoice {
     }
 }
 
+<#
+.SYNOPSIS
+    Appends a timestamped entry to the session log file.
+.DESCRIPTION
+    Creates the log directory and file if they do not exist. Skips VERBOSE entries
+    unless $Global:VerboseEnabled is set. Falls back to a generated file name when
+    $Script:LogFile is not available.
+.PARAMETER Path
+    Directory for the log file. Defaults to .\logs\.
+.PARAMETER LogFile
+    Full path to the log file. Defaults to $Script:LogFile (set at script startup).
+.PARAMETER Message
+    Text to write into the log entry.
+.PARAMETER Type
+    Severity level: INFO (default), WARNING, ERROR, or VERBOSE.
+#>
 function Write-Log {
     [CmdletBinding()]
     Param (
@@ -104,7 +145,7 @@ if ($Global:SilentEnabled) {
     Write-Log -Message "Silent mode is enabled"
 }
 
-# Check for admin rights
+# Verify the process is elevated; exit immediately if not — the script modifies the registry and installs software.
 Write-Log -Type VERBOSE -Message "Checking if the user has admin permisssions with Windows Identity"
 
 $isAdmin = ([Security.Principal.WindowsPrincipal] `
@@ -128,8 +169,10 @@ if (-not $isAdmin) {
 
 
 
-# ALL THE OPTION MENUS
-
+<#
+.SYNOPSIS
+    Displays the main menu and returns the user's choice.
+#>
 function Show-StartMenu {
     Write-Host "kostikasz IT support quick kit
 
@@ -141,9 +184,13 @@ Choose an option:
 [Q] Quit
 
 "
-    return Get-MenuChoice -ValidOptions '1','2','3','4','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','3','4','q'
 }
 
+<#
+.SYNOPSIS
+    Displays the essential apps installation sub-menu and returns the user's choice.
+#>
 function Show-InstallMenu {
     Write-Host "kostikasz IT support quick kit
 
@@ -156,9 +203,13 @@ Choose an option:
 [Q] Quit to main menu
 
 "
-    return Get-MenuChoice -ValidOptions '1','2','3','4','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','3','4','q'
 }
 
+<#
+.SYNOPSIS
+    Displays the bulk installation sub-menu and returns the user's choice.
+#>
 function Show-BulkInstallMenu {
     Write-Host "kostikasz IT support quick kit
 
@@ -170,9 +221,13 @@ Choose an option:
 [Q] Quit to main menu
 
 "
-    return Get-MenuChoice -ValidOptions '1','2','3','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','3','q'
 }
 
+<#
+.SYNOPSIS
+    Displays the browser selection sub-menu and returns the user's choice.
+#>
 function Show-InstallMenuBrowsers {
     Write-Host "kostikasz IT support quick kit
 
@@ -184,9 +239,13 @@ Choose an option:
 [Q] Quit to main menu
 
 "
-    return Get-MenuChoice -ValidOptions '1','2','3','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','3','q'
 }
 
+<#
+.SYNOPSIS
+    Displays the registry fix selection sub-menu and returns the user's choice.
+#>
 function Show-FixMenu {
        Write-Host "kostikasz IT support quick kit
 
@@ -197,9 +256,13 @@ Choose an option:
 [Q] Quit to main menu
 
 "
-    return Get-MenuChoice -ValidOptions '1','2','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','q'
 }
 
+<#
+.SYNOPSIS
+    Displays the system information sub-menu and returns the user's choice.
+#>
 function Show-SystemMenu {
            Write-Host "kostikasz IT support quick kit
 
@@ -213,15 +276,23 @@ Choose an option:
 [Q] Quit to main menu
 
 "
-    return Get-MenuChoice -ValidOptions '1','2','3','4','5','q' # Function returns the choice
-    
+    return Get-MenuChoice -ValidOptions '1','2','3','4','5','q'
+
 }
 
+<#
+.SYNOPSIS
+    Displays a simple exit prompt after viewing system information and waits for 'Q'.
+#>
 function Show-InfoExitMenu {
     Write-Host "To exit enter: [Q]"
-    return Get-MenuChoice -ValidOptions 'q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions 'q'
 }
 
+<#
+.SYNOPSIS
+    Displays a yes/no confirmation prompt before a destructive operation and returns the choice.
+#>
 function Show-ConfirmPrompt {
     Write-Host "kostikasz IT support quick kit
 
@@ -230,9 +301,13 @@ Choose an option:
 [Y] Y (Yes)     [N] N (No)
 
 "
-    return Get-MenuChoice -ValidOptions 'y','n' # Function returns the choice
+    return Get-MenuChoice -ValidOptions 'y','n'
 }
 
+<#
+.SYNOPSIS
+    Displays a yes/no prompt asking whether to revert a previously applied fix and returns the choice.
+#>
 function Show-RevertPrompt {
 
     Write-Host "kostikasz IT support quick kit
@@ -242,10 +317,26 @@ Choose an option:
 [Y] Y (Yes)     [N] N (No)
 
 "
-    return Get-MenuChoice -ValidOptions 'y','n' # Function returns the choice
+    return Get-MenuChoice -ValidOptions 'y','n'
 }
 
 
+<#
+.SYNOPSIS
+    Installs an application via winget and reports the result with a friendly message.
+.DESCRIPTION
+    Calls winget install with the given package ID. Output is suppressed when
+    $Global:SilentEnabled is set. Maps eight known winget exit codes to human-readable
+    messages and logs a WARNING for "already installed" codes; all other non-zero codes
+    are logged as ERROR. Pauses for 3 seconds after each attempt so the user can read the result.
+.PARAMETER appId
+    Winget package identifier (e.g. "Google.Chrome").
+.PARAMETER source
+    Winget source to use: 'winget' (default) or 'msstore'.
+.PARAMETER readableAppId
+    Human-friendly display name shown in console and log messages.
+    Defaults to $appId with dots replaced by spaces.
+#>
 function Invoke-AppInstall {
     param (
         [Parameter(Mandatory=$true)]
@@ -313,6 +404,10 @@ function Invoke-AppInstall {
     Start-Sleep 3
 }
 
+<#
+.SYNOPSIS
+    Presents a loop menu for installing individual browsers and returns to the caller on 'Q'.
+#>
 function Install-Browsers {
     while ($true) {
 
@@ -336,6 +431,13 @@ function Install-Browsers {
 }
 
 
+<#
+.SYNOPSIS
+    Presents a loop menu for selecting essential app categories to install.
+.DESCRIPTION
+    Dispatches to Install-Browsers for category 1; categories 2–4 are stubs that
+    show "Coming soon". Returns to the main menu on 'Q'.
+#>
 function Install-EssentialApps {
     while ($true) {
 
@@ -370,6 +472,39 @@ function Install-EssentialApps {
 }
 
 
+<#
+.SYNOPSIS
+    Applies or reverts a Windows registry fix and restarts Explorer if successful.
+.DESCRIPTION
+    Reads the current registry state to determine whether the fix is already applied.
+    If applied, prompts the user to revert (unless -Silent or -Bulk). If not applied,
+    prompts to apply. Uses reg.exe internally; supports both default-value mode (/ve)
+    and named-value mode (/v) depending on whether -ValueName is provided.
+    Restarts Explorer via Stop-Process after a successful operation. In -Bulk mode,
+    Explorer restart is deferred to the last fix unless -ExplorerRestartBulk is set.
+.PARAMETER RegPath
+    Registry path to operate on (e.g. "HKCU\Software\Classes\...").
+.PARAMETER FixName
+    Human-readable name used in log messages and console output.
+.PARAMETER ApplyCommand
+    reg.exe verb used when applying the fix. Defaults to "add".
+.PARAMETER RevertCommand
+    reg.exe verb used when reverting the fix. Defaults to "delete".
+.PARAMETER ValueName
+    Named value under the key. When omitted, operates on the default value (/ve).
+.PARAMETER ValueType
+    Registry value type passed to reg.exe (e.g. "REG_DWORD"). Defaults to "REG_DWORD".
+.PARAMETER ApplyData
+    Data written to the named value when applying the fix.
+.PARAMETER RevertData
+    Data written to the named value when reverting the fix.
+.PARAMETER Silent
+    Skips all confirmation prompts. Defaults to $Global:SilentEnabled.
+.PARAMETER Bulk
+    Marks the call as part of a bulk operation; forces -Silent and suppresses individual Explorer restarts.
+.PARAMETER ExplorerRestartBulk
+    When combined with -Bulk, restarts Explorer after this specific fix (use on the last fix in a bulk sequence).
+#>
 function Invoke-RegistryFix {
     param (
         [Parameter(Mandatory=$true)]
@@ -378,28 +513,23 @@ function Invoke-RegistryFix {
         [Parameter(Mandatory=$true)]
         [string]$FixName,
 
-
-        # For fixes when reverting or applying uses same or different commands than usual
         [Parameter(Mandatory=$false)]
-        [string]$ApplyCommand = "add",     
+        [string]$ApplyCommand = "add",
 
         [Parameter(Mandatory=$false)]
-        [string]$RevertCommand = "delete",     
+        [string]$RevertCommand = "delete",
 
-
-
-        # New optional params for named values
         [Parameter(Mandatory=$false)]
-        [string]$ValueName = "",          # Empty = default (/ve) mode
+        [string]$ValueName = "",
 
         [Parameter(Mandatory=$false)]
         [string]$ValueType = "REG_DWORD",
 
         [Parameter(Mandatory=$false)]
-        [string]$ApplyData = "",          # Value when applying fix
+        [string]$ApplyData = "",
 
         [Parameter(Mandatory=$false)]
-        [string]$RevertData = "",          # Value when reverting fix
+        [string]$RevertData = "",
 
         [Parameter(Mandatory=$false)]
         [switch]$Silent = $Global:SilentEnabled,
@@ -513,6 +643,13 @@ function Invoke-RegistryFix {
     }
 }
 
+<#
+.SYNOPSIS
+    Presents a loop menu for selecting and applying individual registry fixes.
+.DESCRIPTION
+    Each choice invokes Invoke-RegistryFix with the appropriate registry path and
+    parameters for that fix. Returns to the main menu on 'Q'.
+#>
 function Invoke-Fixes {
     while ($true) {
 
@@ -536,6 +673,12 @@ function Invoke-Fixes {
 
     }
 }
+<#
+.SYNOPSIS
+    Retrieves OS information from WMI and displays or returns it.
+.PARAMETER Raw
+    When set, returns the data object instead of printing to the host.
+#>
 function Get-OSInfo {
     param([Switch]$Raw)
     $data = Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, OSArchitecture
@@ -544,6 +687,12 @@ function Get-OSInfo {
     if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
+<#
+.SYNOPSIS
+    Retrieves CPU information from WMI and displays or returns it.
+.PARAMETER Raw
+    When set, returns the data object instead of printing to the host.
+#>
 function Get-CPUInfo {
     param([Switch]$Raw)
     $data = Get-CimInstance Win32_Processor |
@@ -554,6 +703,14 @@ function Get-CPUInfo {
     if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
+<#
+.SYNOPSIS
+    Retrieves physical RAM information from WMI and displays or returns it.
+.DESCRIPTION
+    Formats capacity as GB or TB and maps the FormFactor integer to a readable string (DIMM, SODIMM, etc.).
+.PARAMETER Raw
+    When set, returns the data object instead of printing to the host.
+#>
 function Get-RamInfo {
     param([Switch]$Raw)
     $data = Get-CimInstance Win32_PhysicalMemory | Select-Object BankLabel, DeviceLocator,
@@ -577,6 +734,14 @@ function Get-RamInfo {
     if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
+<#
+.SYNOPSIS
+    Retrieves physical disk information from WMI and displays or returns it.
+.DESCRIPTION
+    Formats disk size as GB or TB.
+.PARAMETER Raw
+    When set, returns the data object instead of printing to the host.
+#>
 function Get-DiskInfo {
     param([Switch]$Raw)
     $data = Get-CimInstance Win32_DiskDrive | Select-Object Caption, Description, DeviceID, Model, SerialNumber,
@@ -590,6 +755,14 @@ function Get-DiskInfo {
     if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
+<#
+.SYNOPSIS
+    Exports OS, CPU, RAM, and disk information to CSV files in the .\system_info\ directory.
+.DESCRIPTION
+    Creates the output directory if it does not exist. Overwrites existing CSV files and
+    logs a warning for each replaced file. Outputs four files:
+    system_info.csv, cpu_info.csv, ram_info.csv, disk_info.csv.
+#>
 function Export-SystemInfo {
     $sysInfoDir = "system_info"
 
@@ -621,6 +794,13 @@ function Export-SystemInfo {
     Write-Host "System information outputted to files successfully" -ForegroundColor Green
 }
 
+<#
+.SYNOPSIS
+    Installs Chrome, Firefox, and Brave in sequence after a single confirmation prompt.
+.DESCRIPTION
+    Tracks per-browser install success via $LASTEXITCODE after each Invoke-AppInstall call
+    and reports a combined summary (all succeeded / partial / none).
+#>
 function Invoke-BulkBrowserInstall {
     Clear-Host
 
@@ -662,6 +842,14 @@ function Invoke-BulkBrowserInstall {
     }
 }
 
+<#
+.SYNOPSIS
+    Applies all registry fixes in sequence after a single confirmation prompt.
+.DESCRIPTION
+    Calls Invoke-RegistryFix with -Bulk for each fix (skips individual confirmations).
+    Explorer restart is deferred to the last fix via -ExplorerRestartBulk.
+    Reports a combined summary after all fixes run.
+#>
 function Invoke-BulkFixApply {
 
     Write-Log -Message "Bulk fix application starting, requesting confirmation"
@@ -700,11 +888,22 @@ function Invoke-BulkFixApply {
     }
 }
 
+<#
+.SYNOPSIS
+    Placeholder for bulk essential apps installation (not yet implemented).
+#>
 function Invoke-BulkEssentialsInstall {
     Clear-Host
     Write-Host "Coming soon" -ForegroundColor Yellow
 }
 
+<#
+.SYNOPSIS
+    Presents a loop menu for viewing system information categories or exporting to CSV files.
+.DESCRIPTION
+    Dispatches to Get-OSInfo, Get-CPUInfo, Get-RamInfo, Get-DiskInfo, and Export-SystemInfo.
+    Returns to the main menu on 'Q'.
+#>
 function Show-SystemInfo {
     while ($true) {
         switch (Show-SystemMenu) {
@@ -744,6 +943,13 @@ function Show-SystemInfo {
     }
 }
 
+<#
+.SYNOPSIS
+    Presents a loop menu for bulk operations: install browsers, apply all fixes, or install essentials.
+.DESCRIPTION
+    Dispatches to Invoke-BulkBrowserInstall, Invoke-BulkFixApply, and Invoke-BulkEssentialsInstall.
+    Returns to the main menu on 'Q'.
+#>
 function Invoke-BulkInstall {
     while ($true) {
         switch (Show-BulkInstallMenu) {
@@ -773,7 +979,8 @@ function Invoke-BulkInstall {
     }
 }
 
-# Main loop of the starting menu
+# Entry point: clear the screen and enter the main dispatch loop.
+# Each iteration shows the start menu and routes the choice to the appropriate module.
 Clear-Host
 
 while ($true) {
