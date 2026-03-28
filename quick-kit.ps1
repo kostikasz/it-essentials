@@ -212,8 +212,6 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] `
 
 $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
-$isAdmin = $true
-
 if (-not $isAdmin) {
     Write-Log -Type ERROR -Message "Script is running without administrator permissions, please restart with admin permissions"
     Write-Log -Type VERBOSE -Message "$user doesn't have admin permissions"
