@@ -19,7 +19,7 @@ $Global:SilentEnabled = $EnableSilent.IsPresent
 $Script:LogFile = Join-Path -Path '.\logs\' -ChildPath "$(Split-Path $PSCommandPath -Leaf) - $(Get-Date -f 'yyyy-MM-dd_HH-mm-ss').log"
 $Global:ExplorerKilled = $false
 
-function MenuHandler {
+function Get-MenuChoice {
     param(
         [Parameter(Mandatory=$true)]
         [string[]]
@@ -130,7 +130,7 @@ if (-not $isAdmin) {
 
 # ALL THE OPTION MENUS
 
-function StartingMenu {
+function Show-StartMenu {
     Write-Host "kostikasz IT support quick kit
 
 Choose an option:
@@ -141,10 +141,10 @@ Choose an option:
 [Q] Quit
 
 "
-    return MenuHandler -ValidOptions '1','2','3','4','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','3','4','q' # Function returns the choice
 }
 
-function InstallMenu {
+function Show-InstallMenu {
     Write-Host "kostikasz IT support quick kit
 
 ESSENTIAL APPS INSTALLATION
@@ -156,10 +156,10 @@ Choose an option:
 [Q] Quit to main menu
 
 "
-    return MenuHandler -ValidOptions '1','2','3','4','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','3','4','q' # Function returns the choice
 }
 
-function BulkInstallMenu {
+function Show-BulkInstallMenu {
     Write-Host "kostikasz IT support quick kit
 
 BULK INSTALLATION menu
@@ -170,10 +170,10 @@ Choose an option:
 [Q] Quit to main menu
 
 "
-    return MenuHandler -ValidOptions '1','2','3','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','3','q' # Function returns the choice
 }
 
-function InstallMenuBrowsers {
+function Show-InstallMenuBrowsers {
     Write-Host "kostikasz IT support quick kit
 
 BROWSERS INSTALLATION
@@ -184,10 +184,10 @@ Choose an option:
 [Q] Quit to main menu
 
 "
-    return MenuHandler -ValidOptions '1','2','3','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','3','q' # Function returns the choice
 }
 
-function FixMenu {
+function Show-FixMenu {
        Write-Host "kostikasz IT support quick kit
 
 FIX LIST:
@@ -197,10 +197,10 @@ Choose an option:
 [Q] Quit to main menu
 
 "
-    return MenuHandler -ValidOptions '1','2','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','q' # Function returns the choice
 }
 
-function SystemMenu {
+function Show-SystemMenu {
            Write-Host "kostikasz IT support quick kit
 
 System info module:
@@ -213,16 +213,16 @@ Choose an option:
 [Q] Quit to main menu
 
 "
-    return MenuHandler -ValidOptions '1','2','3','4','5','q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions '1','2','3','4','5','q' # Function returns the choice
     
 }
 
-function InfoExitMenu {
+function Show-InfoExitMenu {
     Write-Host "To exit enter: [Q]"
-    return MenuHandler -ValidOptions 'q' # Function returns the choice
+    return Get-MenuChoice -ValidOptions 'q' # Function returns the choice
 }
 
-function ConfirmPrompt {
+function Show-ConfirmPrompt {
     Write-Host "kostikasz IT support quick kit
 
 Are you sure? Make sure you don't have unsaved work.:
@@ -230,10 +230,10 @@ Choose an option:
 [Y] Y (Yes)     [N] N (No)
 
 "
-    return MenuHandler -ValidOptions 'y','n' # Function returns the choice
+    return Get-MenuChoice -ValidOptions 'y','n' # Function returns the choice
 }
 
-function RevertChanges {
+function Show-RevertPrompt {
 
     Write-Host "kostikasz IT support quick kit
 
@@ -242,11 +242,11 @@ Choose an option:
 [Y] Y (Yes)     [N] N (No)
 
 "
-    return MenuHandler -ValidOptions 'y','n' # Function returns the choice
+    return Get-MenuChoice -ValidOptions 'y','n' # Function returns the choice
 }
 
 
-function InstallHandler {
+function Invoke-AppInstall {
     param (
         [Parameter(Mandatory=$true)]
         [String]
@@ -313,18 +313,18 @@ function InstallHandler {
     Start-Sleep 3
 }
 
-function InstallingBrowsers {
+function Install-Browsers {
     while ($true) {
 
-        switch (InstallMenuBrowsers) {
+        switch (Show-InstallMenuBrowsers) {
         "1" {
-            InstallHandler -AppID "Google.Chrome"
+            Invoke-AppInstall -AppID "Google.Chrome"
         }
         "2" {
-            InstallHandler -AppID "Mozilla.Firefox"
+            Invoke-AppInstall -AppID "Mozilla.Firefox"
         }
         "3" {
-            InstallHandler -AppID "Brave.Brave" -ReadableAppID "Brave Browser"
+            Invoke-AppInstall -AppID "Brave.Brave" -ReadableAppID "Brave Browser"
         }
         "q" {
             Clear-Host
@@ -336,14 +336,14 @@ function InstallingBrowsers {
 }
 
 
-function InstallingEssentials {
+function Install-EssentialApps {
     while ($true) {
 
-        switch (InstallMenu) {
+        switch (Show-InstallMenu) {
         "1" {
             Clear-Host
             Write-Host "Opening browser installation menu"
-            InstallingBrowsers
+            Install-Browsers
         }
         "2" {
             Clear-Host
@@ -370,7 +370,7 @@ function InstallingEssentials {
 }
 
 
-function RegistryHandler {
+function Invoke-RegistryFix {
     param (
         [Parameter(Mandatory=$true)]
         [String]$RegPath,
@@ -417,7 +417,7 @@ function RegistryHandler {
 
     Clear-Host
 
-    if ($Silent -or (ConfirmPrompt) -eq 'y') {
+    if ($Silent -or (Show-ConfirmPrompt) -eq 'y') {
 
         Clear-Host
 
@@ -432,7 +432,7 @@ function RegistryHandler {
         if ($alreadyApplied) {
             Write-Warning "The fix is already applied."
 
-            if ($Silent -or (RevertChanges) -eq 'y') {
+            if ($Silent -or (Show-RevertPrompt) -eq 'y') {
                 Write-Log -Message "Reverting $FixName fix at the request of user"
                 Write-Host "Reverting $FixName fix"
 
@@ -513,18 +513,18 @@ function RegistryHandler {
     }
 }
 
-function ApplyFixes {
+function Invoke-Fixes {
     while ($true) {
 
-        switch (FixMenu) {
+        switch (Show-FixMenu) {
         "1" {
             Clear-Host
-            RegistryHandler -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu"
+            Invoke-RegistryFix -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu"
             }
         
         "2" {
             Clear-Host
-            RegistryHandler -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions"
+            Invoke-RegistryFix -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions"
             continue
         }
         "q" {
@@ -536,22 +536,22 @@ function ApplyFixes {
 
     }
 }
-function GetOS {
+function Get-OSInfo {
     param([Switch]$Raw)
     $data = Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, OSArchitecture
     if ($Raw) { return $data }
     $data | Out-Host
-    if ((InfoExitMenu) -eq "q") { return }
+    if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
-function GetCPU {
+function Get-CPUInfo {
     param([Switch]$Raw)
     $data = Get-CimInstance Win32_Processor |
         Select-Object Name, NumberOfCores, NumberOfLogicalProcessors,
             @{ Name = "MaxClockSpeedGHz"; Expression = { "{0:N2} GHz" -f ($_.MaxClockSpeed / 1000) } }
     if ($Raw) { return $data }
     $data | Out-Host
-    if ((InfoExitMenu) -eq "q") { return }
+    if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
 function GetRAM {
@@ -574,7 +574,7 @@ function GetRAM {
         @{Name="Speed (MHz)"; Expression={ "$($_.Speed) MHz" }}
     if ($Raw) { return $data }
     $data | Out-Host
-    if ((InfoExitMenu) -eq "q") { return }
+    if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
 function GetDisk {
@@ -587,7 +587,7 @@ function GetDisk {
         }}
     if ($Raw) { return $data }
     $data | Out-Host
-    if ((InfoExitMenu) -eq "q") { return }
+    if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
 function OutputSysInfo {
@@ -600,8 +600,8 @@ function OutputSysInfo {
     }
 
     $files = @{
-        "system_info.csv" = { GetOS -Raw }
-        "cpu_info.csv"    = { GetCPU -Raw }
+        "system_info.csv" = { Get-OSInfo -Raw }
+        "cpu_info.csv"    = { Get-CPUInfo -Raw }
         "ram_info.csv"    = { GetRAM -Raw }
         "disk_info.csv"   = { GetDisk -Raw }
     }
@@ -626,16 +626,16 @@ function BulkInstallBrowsers {
 
     Write-Log -Message "Bulk browser installation starting, requesting confirmation"
 
-    if ((ConfirmPrompt) -eq "y") {
+    if ((Show-ConfirmPrompt) -eq "y") {
         Write-Log -Message "Bulk browser installation started, confirmed by user"
         Write-Host "Bulk browser installation starting"
-        InstallHandler -AppID "Google.Chrome" -ReadableAppID "Google Chrome"
+        Invoke-AppInstall -AppID "Google.Chrome" -ReadableAppID "Google Chrome"
         $GoogleChromeInstalled = $LASTEXITCODE -eq 0
 
-        InstallHandler -AppID "Mozilla.Firefox" -ReadableAppID "Mozilla Firefox"
+        Invoke-AppInstall -AppID "Mozilla.Firefox" -ReadableAppID "Mozilla Firefox"
         $MozillaFirefoxInstalled = $LASTEXITCODE -eq 0
 
-        InstallHandler -AppID "Brave.Brave" -ReadableAppID "Brave Browser"
+        Invoke-AppInstall -AppID "Brave.Brave" -ReadableAppID "Brave Browser"
         $BraveInstalled = $LASTEXITCODE -eq 0
 
         $downloadedBrowsers = @(
@@ -662,18 +662,18 @@ function BulkInstallBrowsers {
     }
 }
 
-function BulkApplyFixes {
+function BulkInvoke-Fixes {
 
     Write-Log -Message "Bulk fix application starting, requesting confirmation"
 
-    if ((ConfirmPrompt) -eq "y") {
+    if ((Show-ConfirmPrompt) -eq "y") {
 
         Write-Log -Message "Bulk fix application started, confirmed by user"
         Write-Host "Bulk fix application starting"
 
-        RegistryHandler -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu" -Bulk
+        Invoke-RegistryFix -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu" -Bulk
         $ContextMenuApplied = $LASTEXITCODE -eq 0
-        RegistryHandler -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions" -Bulk -ExplorerRestartBulk
+        Invoke-RegistryFix -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions" -Bulk -ExplorerRestartBulk
         $FileExtensionsApplied = $LASTEXITCODE -eq 0
 
         $appliedFixes = @(
@@ -700,18 +700,18 @@ function BulkApplyFixes {
     }
 }
 
-function SystemInfo {
+function Show-SystemInfo {
     while ($true) {
-        switch (SystemMenu) {
+        switch (Show-SystemMenu) {
         "1" {
             Clear-Host
-            GetOS
+            Get-OSInfo
             continue
             }
         
         "2" {
             Clear-Host
-            GetCPU
+            Get-CPUInfo
             continue
         }
         "3" {
@@ -741,7 +741,7 @@ function SystemInfo {
 
 function BulkInstall {
     while ($true) {
-        switch (BulkInstallMenu) {
+        switch (Show-BulkInstallMenu) {
         "1" {
             Clear-Host
             BulkInstallBrowsers
@@ -750,7 +750,7 @@ function BulkInstall {
         
         "2" {
             Clear-Host
-            BulkApplyFixes
+            BulkInvoke-Fixes
             continue
         }
         "3" {
@@ -773,16 +773,16 @@ Clear-Host
 
 while ($true) {
     
-    switch (StartingMenu) {
+    switch (Show-StartMenu) {
         "1" {
                 Clear-Host
                 Write-Host "Opening essential app installation menu"
-                InstallingEssentials
+                Install-EssentialApps
         }
         "2" {
                 Clear-Host
                 Write-Host "Opening fix menu"
-                ApplyFixes
+                Invoke-Fixes
         }
         "3" {
                 Clear-Host
@@ -792,7 +792,7 @@ while ($true) {
         "4" {
                 Clear-Host
                 Write-Host "Opening system info menu"
-                SystemInfo
+                Show-SystemInfo
         }
         "q" {
                 Clear-Host
