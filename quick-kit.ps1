@@ -136,11 +136,12 @@ function StartingMenu {
 Choose an option:
 [1] Install essential apps
 [2] Install fixes
-[3] System information
+[3] Bulk install apps/fixes
+[4] System information
 [Q] Quit
 
 "
-    return MenuHandler -ValidOptions '1','2','3','q' # Function returns the choice
+    return MenuHandler -ValidOptions '1','2','3','4','q' # Function returns the choice
 }
 
 function InstallMenu {
@@ -156,6 +157,20 @@ Choose an option:
 
 "
     return MenuHandler -ValidOptions '1','2','3','4','q' # Function returns the choice
+}
+
+function BulkInstallMenu {
+    Write-Host "kostikasz IT support quick kit
+
+BULK INSTALLATION menu
+Choose an option:
+[1] Install browsers
+[2] Apply all fixes
+[3] Install full essentials pack
+[Q] Quit to main menu
+
+"
+    return MenuHandler -ValidOptions '1','2','3','q' # Function returns the choice
 }
 
 function InstallMenuBrowsers {
@@ -281,7 +296,7 @@ function InstallHandler {
 
     if ($LASTEXITCODE -eq 0) {
         Write-Log -Message "Successfully installed $ReadableAppID"
-        Write-Host "Successfully installed $ReadableAppID, returning to essential app install menu" -ForegroundColor Green
+        Write-Host "Successfully installed $ReadableAppID" -ForegroundColor Green
     } elseif ($friendly_message) {
         if (-not $Global:VerboseEnabled) {
             Write-Log -Type $logType -Message "Failed to install $ReadableAppID. $friendly_message"
@@ -384,14 +399,25 @@ function RegistryHandler {
         [string]$ApplyData = "",          # Value when applying fix
 
         [Parameter(Mandatory=$false)]
-        [string]$RevertData = ""          # Value when reverting fix
+        [string]$RevertData = "",          # Value when reverting fix
+
+        [Parameter(Mandatory=$false)]
+        [switch]$Silent = $Global:SilentEnabled,
+
+        [Parameter(Mandatory=$false)]
+        [switch]$Bulk = $false,
+
+        [Parameter(Mandatory=$false)]
+        [switch]$ExplorerRestartBulk = $false
     )
     
+
+    if($Bulk) {$Silent=$true}
     $useNamedValue = $ValueName -ne ""
 
     Clear-Host
 
-    if ($Global:SilentEnabled -or (ConfirmPrompt) -eq 'y') {
+    if ($Silent -or (ConfirmPrompt) -eq 'y') {
 
         Clear-Host
 
@@ -406,7 +432,7 @@ function RegistryHandler {
         if ($alreadyApplied) {
             Write-Warning "The fix is already applied."
 
-            if ($Global:SilentEnabled -or (RevertChanges) -eq 'y') {
+            if ($Silent -or (RevertChanges) -eq 'y') {
                 Write-Log -Message "Reverting $FixName fix at the request of user"
                 Write-Host "Reverting $FixName fix"
 
@@ -414,14 +440,14 @@ function RegistryHandler {
                 if ($useNamedValue) {
                     # Toggle back to revert value
 
-                    if ($Global:SilentEnabled) {
+                    if ($Silent) {
                         reg.exe $RevertCommand $RegPath /v $ValueName /t $ValueType /d $RevertData /f  | Out-Null
                     } else {
                         reg.exe $RevertCommand $RegPath /v $ValueName /t $ValueType /d $RevertData /f
                     }
                 } else {
 
-                    if ($Global:SilentEnabled) {
+                    if ($Silent) {
                         reg.exe $RevertCommand $RegPath /f | Out-Null
                     } else {
                         reg.exe $RevertCommand $RegPath /f
@@ -430,6 +456,13 @@ function RegistryHandler {
                 }
 
                 if ($LASTEXITCODE -eq 0) {
+                    if ($Bulk) {
+                        if ($ExplorerRestartBulk) {
+                            Stop-Process -ProcessName explorer -Force
+                        }
+                    } else {
+                        Stop-Process -ProcessName explorer -Force
+                    }
                     Stop-Process -ProcessName explorer -Force
                     Write-Log -Message "SUCCESS, reverted $FixName fix."
                     Write-Host -ForegroundColor Green "Fix reverted successfully, returning to menu"
@@ -446,13 +479,13 @@ function RegistryHandler {
 
 
             if ($useNamedValue) {
-                if ($Global:SilentEnabled) {
+                if ($Silent) {
                     reg.exe $ApplyCommand $RegPath /v $ValueName /t $ValueType /d $ApplyData /f | Out-Null
                 } else {
                     reg.exe $ApplyCommand $RegPath /v $ValueName /t $ValueType /d $ApplyData /f
                 }
             } else {
-                if ($Global:SilentEnabled) {
+                if ($Silent) {
                     reg.exe $ApplyCommand $RegPath /f /ve | Out-Null
                 } else {
                     reg.exe $ApplyCommand $RegPath /f /ve
@@ -460,7 +493,13 @@ function RegistryHandler {
             }
 
             if ($LASTEXITCODE -eq 0) {
-                Stop-Process -ProcessName explorer -Force
+                if ($Bulk) {
+                    if ($ExplorerRestartBulk) {
+                        Stop-Process -ProcessName explorer -Force
+                    }
+                } else {
+                    Stop-Process -ProcessName explorer -Force
+                }
                 Write-Log -Message "SUCCESS, applied $FixName fix."
                 Write-Host -ForegroundColor Green "Fix applied successfully, returning to menu"
             } else {
@@ -582,6 +621,85 @@ function OutputSysInfo {
     Write-Host "System information outputted to files successfully" -ForegroundColor Green
 }
 
+function BulkInstallBrowsers {
+    Clear-Host
+
+    Write-Log -Message "Bulk browser installation starting, requesting confirmation"
+
+    if ((ConfirmPrompt) -eq "y") {
+        Write-Log -Message "Bulk browser installation started, confirmed by user"
+        Write-Host "Bulk browser installation starting"
+        InstallHandler -AppID "Google.Chrome" -ReadableAppID "Google Chrome"
+        $GoogleChromeInstalled = $LASTEXITCODE -eq 0
+
+        InstallHandler -AppID "Mozilla.Firefox" -ReadableAppID "Mozilla Firefox"
+        $MozillaFirefoxInstalled = $LASTEXITCODE -eq 0
+
+        InstallHandler -AppID "Brave.Brave" -ReadableAppID "Brave Browser"
+        $BraveInstalled = $LASTEXITCODE -eq 0
+
+        $downloadedBrowsers = @(
+            if ($GoogleChromeInstalled)  { "Google Chrome" }
+            if ($MozillaFirefoxInstalled) { "Mozilla Firefox" }
+            if ($BraveInstalled)          { "Brave Browser" }
+        ) -join ", "
+
+        if (-not $GoogleChromeInstalled -and -not $MozillaFirefoxInstalled -and -not $BraveInstalled) {
+            Write-Log -Type ERROR -Message "Bulk browser installation failed, no browsers were downloaded"
+            Write-Host -ForegroundColor Red "Bulk browser installation failed, no browsers were downloaded, returning to menu"
+            Start-Sleep 1
+        } elseif ($GoogleChromeInstalled -or $MozillaFirefoxInstalled -or $BraveInstalled) {
+            Write-Log -Message "Bulk browser installation was partly successful, downloaded $downloadedBrowsers"
+            Write-Host "Bulk browser installation was partly successful, downloaded $downloadedBrowsers"
+            Start-Sleep 1
+        } else {
+            Write-Log -Message "Bulk browser installation was successful, downloaded $downloadedBrowsers"
+            Write-Host -ForegroundColor Green "Bulk browser installation was successful, downloaded $downloadedBrowsers"
+        }
+    } else {
+        Write-Log -Message "Bulk browser installation cancelled by user"
+        Write-Host "Cancelled. Returning to menu"
+    }
+}
+
+function BulkApplyFixes {
+
+    Write-Log -Message "Bulk fix application starting, requesting confirmation"
+
+    if ((ConfirmPrompt) -eq "y") {
+
+        Write-Log -Message "Bulk fix application started, confirmed by user"
+        Write-Host "Bulk fix application starting"
+
+        RegistryHandler -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu" -Bulk
+        $ContextMenuApplied = $LASTEXITCODE -eq 0
+        RegistryHandler -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions" -Bulk -ExplorerRestartBulk
+        $FileExtensionsApplied = $LASTEXITCODE -eq 0
+
+        $appliedFixes = @(
+            if ($ContextMenuApplied)  { "right-click context menu" }
+            if ($FileExtensionsApplied) { "file extensions" }
+        ) -join ", "
+
+        if (-not $ContextMenuApplied -and -not $FileExtensionsApplied) {
+            Write-Log -Type ERROR -Message "Bulk fix application failed, no fixes were applied"
+            Write-Host -ForegroundColor Red "Bulk fix application failed, no fixes were applied, returning to menu"
+            Start-Sleep 1
+        } elseif ($GoogleChromeInstalled -or $MozillaFirefoxInstalled -or $BraveInstalled) {
+            Write-Log -Message "Bulk fix application was partly successful, applied $appliedFixes"
+            Write-Host "Bulk fix application was partly successful, applied $appliedFixes"
+            Start-Sleep 1
+        } else {
+            Write-Log -Message "Bulk fix application was successful, applied $appliedFixes"
+            Write-Host -ForegroundColor Green "Bulk fix application was successful, applied $appliedFixes"
+        }
+
+    } else {
+        Write-Log -Message "Bulk fix application cancelled by user"
+        Write-Host "Cancelled. Returning to menu"
+    }
+}
+
 function SystemInfo {
     while ($true) {
         switch (SystemMenu) {
@@ -621,6 +739,34 @@ function SystemInfo {
     }
 }
 
+function BulkInstall {
+    while ($true) {
+        switch (BulkInstallMenu) {
+        "1" {
+            Clear-Host
+            BulkInstallBrowsers
+            continue
+            }
+        
+        "2" {
+            Clear-Host
+            BulkApplyFixes
+            continue
+        }
+        "3" {
+            Clear-Host
+            BulkInstallEssentials
+            continue
+        }
+        "q" {
+            Clear-Host
+            Write-Host "Returning to main menu"
+            return
+        }
+       }
+
+    }
+}
 
 # Main loop of the starting menu
 Clear-Host
@@ -639,6 +785,11 @@ while ($true) {
                 ApplyFixes
         }
         "3" {
+                Clear-Host
+                Write-Host "Opening bulk install menu"
+                BulkInstall
+        }
+        "4" {
                 Clear-Host
                 Write-Host "Opening system info menu"
                 SystemInfo
