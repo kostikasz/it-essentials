@@ -23,7 +23,7 @@ function Get-MenuChoice {
     param(
         [Parameter(Mandatory=$true)]
         [string[]]
-        $ValidOptions # Should all be passed in lower-case
+        $validOptions # Should all be passed in lower-case
     )
     
     while ($true) {
@@ -33,7 +33,7 @@ function Get-MenuChoice {
             Write-Log -Type WARNING -Message "User inputed nothing into the menu prompt, retrying"
             Write-Host "You input nothing."
             continue
-        } elseif ($option -notin $ValidOptions) {
+        } elseif ($option -notin $validOptions) {
             Write-Log -Type WARNING -Message "User inputed an invalid option in the menu, retrying..."
             Write-Host "Invalid option."
             continue
@@ -250,65 +250,65 @@ function Invoke-AppInstall {
     param (
         [Parameter(Mandatory=$true)]
         [String]
-        $AppID,
+        $appId,
 
         [Parameter(Mandatory=$false)]
         [ValidateSet('winget', 'msstore')]
         [String]
-        $Source = 'winget',
+        $source = 'winget',
 
         [Parameter(Mandatory=$false)]
         [String]
-        $ReadableAppID = $AppID.Replace("."," ")
+        $readableAppId = $appId.Replace("."," ")
     )
 
     $exitMessages = @{
     0          = $null   # Success
     -1978335212 = "The installer was cancelled or interrupted. Please try again."
-    -1978335189 = "'$ReadableAppID' is already installed and up to date."
-    -1978335203 = "'$ReadableAppID' is already installed and up to date."
-    -1978335191 = "There are multiple packages matching '$AppID'. Try narrowing the source or using the full package ID."
+    -1978335189 = "'$readableAppId' is already installed and up to date."
+    -1978335203 = "'$readableAppId' is already installed and up to date."
+    -1978335191 = "There are multiple packages matching '$appId'. Try narrowing the source or using the full package ID."
     -1978335215 = "Insufficient permissions. Contact your system administrator."
     -1978335180 = "Download failed. Check your internet connection and try again."
     -1978335179 = "The installer hash did not match. The package may be corrupted or tampered with."
-    -1978335163 = "Disk space is insufficient to install '$ReadableAppID'."
+    -1978335163 = "Disk space is insufficient to install '$readableAppId'."
     }
 
     $warningCodes = @(-1978335189, -1978335203)
 
     Clear-Host
-    Write-Host "Installing $ReadableAppID"
+    Write-Host "Installing $readableAppId"
     if (-not $Global:VerboseEnabled) {
-        Write-Log -Message "Installing $ReadableAppID"
+        Write-Log -Message "Installing $readableAppId"
     }
 
     if ($Global:SilentEnabled) {
-        Write-Log -Type VERBOSE -Message "Installing $ReadableAppID via winget install -e --id $AppID --source=$Source > $null 2>&1"
-        winget.exe install -e --id $AppID --source=$Source > $null 2>&1
+        Write-Log -Type VERBOSE -Message "Installing $readableAppId via winget install -e --id $appId --source=$source > $null 2>&1"
+        winget.exe install -e --id $appId --source=$source > $null 2>&1
     } else {
-        Write-Log -Type VERBOSE -Message "Installing $ReadableAppID via winget install -e --id $AppID --source=$Source"
-        winget.exe install -e --id $AppID --source=$Source
+        Write-Log -Type VERBOSE -Message "Installing $readableAppId via winget install -e --id $appId --source=$source"
+        winget.exe install -e --id $appId --source=$source
     }
 
-    $friendly_message=$exitMessages[$LASTEXITCODE]
+    $friendlyMessage = $exitMessages[$LASTEXITCODE]
     $logType = if ($LASTEXITCODE -in $warningCodes) { 'WARNING' } else { 'ERROR' }
 
 
     if ($LASTEXITCODE -eq 0) {
-        Write-Log -Message "Successfully installed $ReadableAppID"
-        Write-Host "Successfully installed $ReadableAppID" -ForegroundColor Green
-    } elseif ($friendly_message) {
+        Write-Log -Message "Successfully installed $readableAppId"
+        Write-Host "Successfully installed $readableAppId" -ForegroundColor Green
+    } elseif ($friendlyMessage) {
         if (-not $Global:VerboseEnabled) {
-            Write-Log -Type $logType -Message "Failed to install $ReadableAppID. $friendly_message"
+            Write-Log -Type $logType -Message "Failed to install $readableAppId. $friendlyMessage"
         }
-        Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget with error code $LASTEXITCODE. $friendly_message"
-        Write-Warning "Failed to install $ReadableAppID. $friendly_message"
+        Write-Log -Type VERBOSE -Message "FAILED to install $readableAppId via winget with error code $LASTEXITCODE. $friendlyMessage"
+        Write-Warning "Failed to install $readableAppId. $friendlyMessage"
     } else {
         if (-not $Global:VerboseEnabled) {
-            Write-Log -Type $logType -Message "Failed to install $ReadableAppID. Unknown error code: $LASTEXITCODE"
+            Write-Log -Type $logType -Message "Failed to install $readableAppId. Unknown error code: $LASTEXITCODE"
         }
-        Write-Log -Type VERBOSE -Message "FAILED to install $ReadableAppID via winget. Unknown error code: '$LASTEXITCODE'. Please submit an issue."
-        Write-Warning "Failed to install $ReadableAppID. Unknown error code: $LASTEXITCODE"
+        Write-Log -Type VERBOSE -Message "FAILED to install $readableAppId via winget. Unknown error code: '$LASTEXITCODE'. Please submit an issue."
+        Write-Warning "Failed to install $readableAppId. Unknown error code: $LASTEXITCODE"
     }
     Start-Sleep 3
 }
@@ -318,13 +318,13 @@ function Install-Browsers {
 
         switch (Show-InstallMenuBrowsers) {
         "1" {
-            Invoke-AppInstall -AppID "Google.Chrome"
+            Invoke-AppInstall -AppId "Google.Chrome"
         }
         "2" {
-            Invoke-AppInstall -AppID "Mozilla.Firefox"
+            Invoke-AppInstall -AppId "Mozilla.Firefox"
         }
         "3" {
-            Invoke-AppInstall -AppID "Brave.Brave" -ReadableAppID "Brave Browser"
+            Invoke-AppInstall -AppId "Brave.Brave" -ReadableAppId "Brave Browser"
         }
         "q" {
             Clear-Host
@@ -554,7 +554,7 @@ function Get-CPUInfo {
     if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
-function GetRAM {
+function Get-RamInfo {
     param([Switch]$Raw)
     $data = Get-CimInstance Win32_PhysicalMemory | Select-Object BankLabel, DeviceLocator,
         @{Name="Capacity"; Expression={
@@ -577,7 +577,7 @@ function GetRAM {
     if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
-function GetDisk {
+function Get-DiskInfo {
     param([Switch]$Raw)
     $data = Get-CimInstance Win32_DiskDrive | Select-Object Caption, Description, DeviceID, Model, SerialNumber,
         @{Name="Size"; Expression={
@@ -590,7 +590,7 @@ function GetDisk {
     if ((Show-InfoExitMenu) -eq "q") { return }
 }
 
-function OutputSysInfo {
+function Export-SystemInfo {
     $sysInfoDir = "system_info"
 
     if (-not (Test-Path -Path $sysInfoDir)) {
@@ -602,8 +602,8 @@ function OutputSysInfo {
     $files = @{
         "system_info.csv" = { Get-OSInfo -Raw }
         "cpu_info.csv"    = { Get-CPUInfo -Raw }
-        "ram_info.csv"    = { GetRAM -Raw }
-        "disk_info.csv"   = { GetDisk -Raw }
+        "ram_info.csv"    = { Get-RamInfo -Raw }
+        "disk_info.csv"   = { Get-DiskInfo -Raw }
     }
 
     foreach ($fileName in $files.Keys) {
@@ -621,7 +621,7 @@ function OutputSysInfo {
     Write-Host "System information outputted to files successfully" -ForegroundColor Green
 }
 
-function BulkInstallBrowsers {
+function Invoke-BulkBrowserInstall {
     Clear-Host
 
     Write-Log -Message "Bulk browser installation starting, requesting confirmation"
@@ -629,26 +629,26 @@ function BulkInstallBrowsers {
     if ((Show-ConfirmPrompt) -eq "y") {
         Write-Log -Message "Bulk browser installation started, confirmed by user"
         Write-Host "Bulk browser installation starting"
-        Invoke-AppInstall -AppID "Google.Chrome" -ReadableAppID "Google Chrome"
-        $GoogleChromeInstalled = $LASTEXITCODE -eq 0
+        Invoke-AppInstall -AppId "Google.Chrome" -ReadableAppId "Google Chrome"
+        $googleChromeInstalled = $LASTEXITCODE -eq 0
 
-        Invoke-AppInstall -AppID "Mozilla.Firefox" -ReadableAppID "Mozilla Firefox"
-        $MozillaFirefoxInstalled = $LASTEXITCODE -eq 0
+        Invoke-AppInstall -AppId "Mozilla.Firefox" -ReadableAppId "Mozilla Firefox"
+        $mozillaFirefoxInstalled = $LASTEXITCODE -eq 0
 
-        Invoke-AppInstall -AppID "Brave.Brave" -ReadableAppID "Brave Browser"
-        $BraveInstalled = $LASTEXITCODE -eq 0
+        Invoke-AppInstall -AppId "Brave.Brave" -ReadableAppId "Brave Browser"
+        $braveInstalled = $LASTEXITCODE -eq 0
 
         $downloadedBrowsers = @(
-            if ($GoogleChromeInstalled)  { "Google Chrome" }
-            if ($MozillaFirefoxInstalled) { "Mozilla Firefox" }
-            if ($BraveInstalled)          { "Brave Browser" }
+            if ($googleChromeInstalled)  { "Google Chrome" }
+            if ($mozillaFirefoxInstalled) { "Mozilla Firefox" }
+            if ($braveInstalled)          { "Brave Browser" }
         ) -join ", "
 
-        if (-not $GoogleChromeInstalled -and -not $MozillaFirefoxInstalled -and -not $BraveInstalled) {
+        if (-not $googleChromeInstalled -and -not $mozillaFirefoxInstalled -and -not $braveInstalled) {
             Write-Log -Type ERROR -Message "Bulk browser installation failed, no browsers were downloaded"
             Write-Host -ForegroundColor Red "Bulk browser installation failed, no browsers were downloaded, returning to menu"
             Start-Sleep 1
-        } elseif ($GoogleChromeInstalled -or $MozillaFirefoxInstalled -or $BraveInstalled) {
+        } elseif ($googleChromeInstalled -or $mozillaFirefoxInstalled -or $braveInstalled) {
             Write-Log -Message "Bulk browser installation was partly successful, downloaded $downloadedBrowsers"
             Write-Host "Bulk browser installation was partly successful, downloaded $downloadedBrowsers"
             Start-Sleep 1
@@ -662,7 +662,7 @@ function BulkInstallBrowsers {
     }
 }
 
-function BulkInvoke-Fixes {
+function Invoke-BulkFixApply {
 
     Write-Log -Message "Bulk fix application starting, requesting confirmation"
 
@@ -672,20 +672,20 @@ function BulkInvoke-Fixes {
         Write-Host "Bulk fix application starting"
 
         Invoke-RegistryFix -RegPath "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -FixName "right-click context menu" -Bulk
-        $ContextMenuApplied = $LASTEXITCODE -eq 0
+        $contextMenuApplied = $LASTEXITCODE -eq 0
         Invoke-RegistryFix -RegPath "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -ValueName "HideFileExt" -ValueType "REG_DWORD" -ApplyData "0" -RevertData "1" -RevertCommand "add" -FixName "show/hide app extensions" -Bulk -ExplorerRestartBulk
-        $FileExtensionsApplied = $LASTEXITCODE -eq 0
+        $fileExtensionsApplied = $LASTEXITCODE -eq 0
 
         $appliedFixes = @(
-            if ($ContextMenuApplied)  { "right-click context menu" }
-            if ($FileExtensionsApplied) { "file extensions" }
+            if ($contextMenuApplied)  { "right-click context menu" }
+            if ($fileExtensionsApplied) { "file extensions" }
         ) -join ", "
 
-        if (-not $ContextMenuApplied -and -not $FileExtensionsApplied) {
+        if (-not $contextMenuApplied -and -not $fileExtensionsApplied) {
             Write-Log -Type ERROR -Message "Bulk fix application failed, no fixes were applied"
             Write-Host -ForegroundColor Red "Bulk fix application failed, no fixes were applied, returning to menu"
             Start-Sleep 1
-        } elseif ($GoogleChromeInstalled -or $MozillaFirefoxInstalled -or $BraveInstalled) {
+        } elseif ($googleChromeInstalled -or $mozillaFirefoxInstalled -or $braveInstalled) {
             Write-Log -Message "Bulk fix application was partly successful, applied $appliedFixes"
             Write-Host "Bulk fix application was partly successful, applied $appliedFixes"
             Start-Sleep 1
@@ -698,6 +698,11 @@ function BulkInvoke-Fixes {
         Write-Log -Message "Bulk fix application cancelled by user"
         Write-Host "Cancelled. Returning to menu"
     }
+}
+
+function Invoke-BulkEssentialsInstall {
+    Clear-Host
+    Write-Host "Coming soon" -ForegroundColor Yellow
 }
 
 function Show-SystemInfo {
@@ -716,17 +721,17 @@ function Show-SystemInfo {
         }
         "3" {
             Clear-Host
-            GetRAM
+            Get-RamInfo
             continue
         }
         "4" {
             Clear-Host
-            GetDisk
+            Get-DiskInfo
             continue
         }
         "5" {
             Clear-Host
-            OutputSysInfo
+            Export-SystemInfo
             continue
         }
         "q" {
@@ -739,23 +744,23 @@ function Show-SystemInfo {
     }
 }
 
-function BulkInstall {
+function Invoke-BulkInstall {
     while ($true) {
         switch (Show-BulkInstallMenu) {
         "1" {
             Clear-Host
-            BulkInstallBrowsers
+            Invoke-BulkBrowserInstall
             continue
             }
         
         "2" {
             Clear-Host
-            BulkInvoke-Fixes
+            Invoke-BulkFixApply
             continue
         }
         "3" {
             Clear-Host
-            BulkInstallEssentials
+            Invoke-BulkEssentialsInstall
             continue
         }
         "q" {
@@ -787,7 +792,7 @@ while ($true) {
         "3" {
                 Clear-Host
                 Write-Host "Opening bulk install menu"
-                BulkInstall
+                Invoke-BulkInstall
         }
         "4" {
                 Clear-Host
